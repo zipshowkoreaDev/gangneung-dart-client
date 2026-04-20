@@ -210,6 +210,8 @@ export function useGyroscope({
       aimRef.current = { x, y };
       setAimPosition({ x, y });
 
+      if (throwCountRef.current >= 3) return;
+
       if (dx > 0.01 || dy > 0.01) {
         const now = performance.now();
         if (now - lastAimSentRef.current > AIM_INTERVAL) {
