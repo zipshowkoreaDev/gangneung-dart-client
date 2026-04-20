@@ -262,6 +262,14 @@ export function useGyroscope({
 
           if (throwCountRef.current >= 3) {
             setHasFinishedTurn(true);
+
+            // motion 리스너 즉시 제거 — 유령 던짐 방지
+            if (handleMotionRef.current) {
+              window.removeEventListener("devicemotion", handleMotionRef.current);
+              handleMotionRef.current = null;
+            }
+
+            // orientation 리스너는 3초 후 제거 (디스플레이 애니메이션 대기)
             setTimeout(() => stopSensors(), 3000);
           }
         }
