@@ -80,6 +80,9 @@ export function useDisplaySocket({
   const playerOrderRef = useRef(playerOrder);
   const onPlayerFinishRef = useRef(onPlayerFinish);
 
+  // React state 비동기 반영 경쟁 조건 방지: 점수를 ref로 동기 추적
+  const playerScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
+
   useEffect(() => {
     playersRef.current = players;
   }, [players]);
@@ -205,17 +208,19 @@ export function useDisplaySocket({
         if (player) {
           const newCurrentThrows = player.currentThrows + 1;
           const isLastThrow = newCurrentThrows >= 3;
+          const newScore = player.score + score;
+
+          // React 상태 반영 전 onAimOff가 먼저 실행되는 경쟁 조건 방지
+          playerScoresRef.current.set(key, { name: player.name, score: newScore });
 
           next.set(key, {
             ...player,
-            score: player.score + score,
+            score: newScore,
             totalThrows: player.totalThrows + 1,
             currentThrows: isLastThrow ? 0 : newCurrentThrows,
           });
           onLog?.(
-            `Score: ${player.name} ${player.score} -> ${
-              player.score + score
-            } (Throw ${newCurrentThrows}/3)`
+            `Score: ${player.name} ${player.score} -> ${newScore} (Throw ${newCurrentThrows}/3)`
           );
         }
 
@@ -317,7 +322,13 @@ export function useDisplaySocket({
       });
 
       if (key !== "_display") {
-        const finishedPlayer = playersRef.current.get(key);
+        // throw-dart와 aim-off가 같은 JS 태스크에서 처리될 경우 playersRef가 stale할 수 있으므로
+        // 동기적으로 누적한 playerScoresRef 값을 우선 사용
+        const tracked = playerScoresRef.current.get(key);
+        const basePlayer = playersRef.current.get(key);
+        const finishedName = tracked?.name ?? basePlayer?.name;
+        const finishedScore = tracked?.score ?? basePlayer?.score ?? 0;
+        playerScoresRef.current.delete(key);
 
         setPlayers((prev) => {
           const next = new Map(prev);
@@ -335,9 +346,9 @@ export function useDisplaySocket({
           );
         }, CLEAR_DARTS_DELAY_MS);
 
-        if (data.room && finishedPlayer) {
-          emitFinishGame(data.room, finishedPlayer, data.socketId);
-          onPlayerFinishRef.current?.(finishedPlayer.name, finishedPlayer.score);
+        if (data.room && basePlayer && finishedName) {
+          emitFinishGame(data.room, { ...basePlayer, name: finishedName, score: finishedScore }, data.socketId);
+          onPlayerFinishRef.current?.(finishedName, finishedScore);
         }
       }
     };
