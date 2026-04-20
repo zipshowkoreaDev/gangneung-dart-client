@@ -4,15 +4,16 @@ interface GameScreenProps {
   sensorsReady: boolean;
   sensorError: string;
   onRequestPermission: () => void;
+  onCalibrate: () => void;
 }
 
-// 게임 플레이 화면 (자이로 조준 패드)
 export default function GameScreen({
   aimPosition,
   throwsLeft,
   sensorsReady,
   sensorError,
   onRequestPermission,
+  onCalibrate,
 }: GameScreenProps) {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center">
@@ -25,9 +26,7 @@ export default function GameScreen({
         <div
           className="absolute top-1/2 left-1/2 w-[60px] h-[60px] rounded-full border-4 border-[#FFD700] bg-[#FFD700]/30 pointer-events-none transition-transform duration-[50ms] ease-out"
           style={{
-            transform: `translate(calc(-50% + ${
-              aimPosition.x * 45
-            }%), calc(-50% + ${aimPosition.y * 45}%))`,
+            transform: `translate(calc(-50% + ${aimPosition.x * 45}%), calc(-50% + ${aimPosition.y * 45}%))`,
           }}
         />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white text-sm opacity-50 pointer-events-none">
@@ -48,6 +47,13 @@ export default function GameScreen({
           </span>
         ))}
       </div>
+
+      <button
+        onClick={onCalibrate}
+        className="mt-4 px-5 py-3 text-sm font-semibold rounded-full border-none bg-white/20 text-white cursor-pointer"
+      >
+        조준 영점 조절
+      </button>
 
       {!sensorsReady && (
         <button

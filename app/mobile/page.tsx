@@ -54,13 +54,6 @@ export default function MobilePage() {
     slot: assignedSlot,
   });
 
-  const emitAimUpdateWithTimeout = useCallback(
-    (aim: { x: number; y: number }, skin?: string) => {
-      emitAimUpdate(aim, skin);
-    },
-    [emitAimUpdate]
-  );
-
   const {
     aimPosition,
     sensorsReady,
@@ -72,8 +65,9 @@ export default function MobilePage() {
     stopSensors,
     requestMotionPermission,
     setHasFinishedTurn,
+    calibrate,
   } = useGyroscope({
-    emitAimUpdate: emitAimUpdateWithTimeout,
+    emitAimUpdate,
     emitAimOff,
     emitThrowDart,
     rouletteRadius,
@@ -103,11 +97,8 @@ export default function MobilePage() {
   usePageLeave({ joinedQueueRef });
 
   useGameLifecycle({
-    isInGame,
-    throwsLeft,
     hasFinishedTurn,
     isInQueue,
-    setHasFinishedTurn,
     leaveQueue,
     stopSensors,
   });
@@ -175,6 +166,7 @@ export default function MobilePage() {
           sensorsReady={sensorsReady}
           sensorError={sensorError}
           onRequestPermission={handleRequestPermission}
+          onCalibrate={calibrate}
         />
       )}
 
