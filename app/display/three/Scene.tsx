@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useMemo } from "react";
-import { OrbitControls, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -140,14 +140,13 @@ interface FlyingDartData {
 
 let cachedRouletteRadius = 20;
 
-function RotatingRoulette({
+function Roulette({
   flyingDarts,
   stuckDarts,
 }: {
   flyingDarts: FlyingDartData[];
   stuckDarts: ThrownDart[];
 }) {
-  const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF("/models/roulette.glb");
 
   useMemo(() => {
@@ -156,14 +155,9 @@ function RotatingRoulette({
     cachedRouletteRadius = Math.max(size.x, size.y) / 2;
   }, [scene]);
 
-  useFrame((_, delta) => {
-    if (!groupRef.current) return;
-    groupRef.current.rotation.z -= delta * 0.3;
-  });
-
   return (
-    <group ref={groupRef}>
-      <primitive object={scene} rotation={[0, -Math.PI / 2, 0]} scale={1} />
+    <group>
+      <primitive object={scene} rotation={[0, -Math.PI / 2, 0]} />
 
       {flyingDarts.map((dart) => (
         <FlyingDart
@@ -273,17 +267,14 @@ export default function Scene() {
 
   return (
     <>
-      {/* DART_THROW 이벤트 핸들러 */}
       <DartEventHandler onDartThrow={handleDartThrow} />
 
-      {/* 기본 조명 - 전체 밝기 */}
       <ambientLight intensity={1.5} color={"white"} />
       <directionalLight position={[-20, 0, 20]} intensity={1.5} color="#ffffff" />
       <directionalLight position={[20, 0, 20]} intensity={1.5} color="#ffffff" />
       <directionalLight position={[0, 20, 15]} intensity={1.5} />
 
-      <RotatingRoulette flyingDarts={flyingDarts} stuckDarts={stuckDarts} />
-      <OrbitControls enableZoom={false} />
+      <Roulette flyingDarts={flyingDarts} stuckDarts={stuckDarts} />
     </>
   );
 }
