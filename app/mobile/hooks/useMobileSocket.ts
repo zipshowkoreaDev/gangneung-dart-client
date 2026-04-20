@@ -51,10 +51,10 @@ export function useMobileSocket({
     onGameResultRef.current = onGameResult;
   }, [onGameResult]);
 
-  // slot이 할당되면 저장
+  // enabled가 true로 바뀔 때(재입장 포함)에도 slotRef를 동기화
   useEffect(() => {
     slotRef.current = slot;
-  }, [slot]);
+  }, [slot, enabled]);
 
   // enabled && slot이 있을 때 joinRoom
   useEffect(() => {
