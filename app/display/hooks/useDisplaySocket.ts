@@ -332,14 +332,20 @@ export function useDisplaySocket({
 
         setPlayers((prev) => {
           const next = new Map(prev);
-          if (prev.has(key)) {
-            next.delete(key);
+          const player = prev.get(key);
+          if (player) {
+            next.set(key, {
+              ...player,
+              score: finishedScore,
+              isConnected: false,
+              isReady: false,
+              totalThrows: Math.max(player.totalThrows, 3),
+              currentThrows: 0,
+            });
             onLog?.(`Aim off: ${key}`);
           }
           return next;
         });
-
-        setPlayerOrder((prev) => prev.filter((name) => name !== key));
         window.setTimeout(() => {
           window.dispatchEvent(
             new CustomEvent("CLEAR_PLAYER_DARTS", { detail: { key } })

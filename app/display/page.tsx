@@ -66,11 +66,9 @@ export default function DisplayPage() {
     };
 
     window.addEventListener("DART_THROW", handleDartThrow);
-    window.addEventListener("GAME_RESULT", handleGameFinished);
     window.addEventListener("GAME_FINISHED", handleGameFinished);
     return () => {
       window.removeEventListener("DART_THROW", handleDartThrow);
-      window.removeEventListener("GAME_RESULT", handleGameFinished);
       window.removeEventListener("GAME_FINISHED", handleGameFinished);
     };
   }, []);
