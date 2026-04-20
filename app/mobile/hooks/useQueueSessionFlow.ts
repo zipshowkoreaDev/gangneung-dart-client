@@ -7,10 +7,10 @@ type UseQueueSessionFlowParams = {
   room: string;
   name: string;
   isInGame: boolean;
-  startSensors: () => void;
   setAssignedSlot: (value: PlayerSlot | null) => void;
   setHasJoined: (value: boolean) => void;
   setIsInGame: (value: boolean) => void;
+  setGamePlayers: (value: string[]) => void;
 };
 
 type UseQueueSessionFlowReturn = {
@@ -27,20 +27,20 @@ export default function useQueueSessionFlow({
   room,
   name,
   isInGame,
-  startSensors,
   setAssignedSlot,
   setHasJoined,
   setIsInGame,
+  setGamePlayers,
 }: UseQueueSessionFlowParams): UseQueueSessionFlowReturn {
   const handleEnterGame = useCallback(
-    (slot: PlayerSlot) => {
+    (slot: PlayerSlot, players: string[]) => {
       debugLog(`✅ 게임 입장, 슬롯: ${slot}`);
       setAssignedSlot(slot);
       setHasJoined(true);
       setIsInGame(true);
-      startSensors();
+      setGamePlayers(players);
     },
-    [setAssignedSlot, setHasJoined, setIsInGame, startSensors]
+    [setAssignedSlot, setHasJoined, setIsInGame, setGamePlayers]
   );
 
   const {

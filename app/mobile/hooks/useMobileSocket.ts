@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { socket } from "@/shared/socket";
-import { getPlayerRoom, type PlayerSlot } from "@/lib/room";
+import { getAllPlayerRooms, getPlayerRoom, type PlayerSlot } from "@/lib/room";
 import { debugLog } from "@/app/mobile/components/DebugOverlay";
 
 interface UseMobileSocketProps {
@@ -9,6 +9,7 @@ interface UseMobileSocketProps {
   enabled: boolean;
   slot: PlayerSlot | null;
   onGameResult?: (data: GameResultPayload) => void;
+  onPlayerFinished?: (playerId: string) => void;
 }
 
 type GameResultPayload = {
@@ -39,17 +40,23 @@ export function useMobileSocket({
   enabled,
   slot,
   onGameResult,
+  onPlayerFinished,
 }: UseMobileSocketProps) {
   const [isConnected, setIsConnected] = useState(false);
   const throwCountRef = useRef(0);
   const hasJoinedRef = useRef(false);
   const currentRoomRef = useRef<string>("");
+  const joinedRoomsRef = useRef<Set<string>>(new Set());
   const slotRef = useRef<PlayerSlot | null>(null);
 
   const onGameResultRef = useRef(onGameResult);
+  const onPlayerFinishedRef = useRef(onPlayerFinished);
   useEffect(() => {
     onGameResultRef.current = onGameResult;
   }, [onGameResult]);
+  useEffect(() => {
+    onPlayerFinishedRef.current = onPlayerFinished;
+  }, [onPlayerFinished]);
 
   // enabled가 true로 바뀔 때(재입장 포함)에도 slotRef를 동기화
   useEffect(() => {
@@ -61,6 +68,7 @@ export function useMobileSocket({
     if (!room || !enabled || !slot) return;
 
     const playerRoom = getPlayerRoom(room, slot);
+    const playerRooms = getAllPlayerRooms(room);
 
     if (hasJoinedRef.current && currentRoomRef.current === playerRoom) {
       return;
@@ -74,7 +82,10 @@ export function useMobileSocket({
     const joinPlayerRoom = () => {
       if (hasJoinedRef.current && currentRoomRef.current === playerRoom) return;
       debugLog(`[Socket] joinRoom: ${playerRoom}, name: ${name}`);
-      socket.emit("joinRoom", { room: playerRoom, name });
+      playerRooms.forEach((targetRoom) => {
+        socket.emit("joinRoom", { room: targetRoom, name });
+        joinedRoomsRef.current.add(targetRoom);
+      });
       hasJoinedRef.current = true;
       currentRoomRef.current = playerRoom;
     };
@@ -90,6 +101,17 @@ export function useMobileSocket({
       onGameResultRef.current?.(data);
     };
 
+    const handleAimOff = (data: {
+      socketId?: string;
+      playerId?: string;
+      name?: string;
+    }) => {
+      const playerId = data.socketId || data.playerId || data.name;
+      if (!playerId || playerId === "_display") return;
+      debugLog(`[Socket] player finished: ${playerId}`);
+      onPlayerFinishedRef.current?.(playerId);
+    };
+
     const handleDisconnect = () => {
       debugLog("[Socket] disconnected");
       setIsConnected(false);
@@ -101,6 +123,7 @@ export function useMobileSocket({
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("game-result", handleGameResult);
+    socket.on("aim-off", handleAimOff);
 
     if (socket.connected && !hasJoinedRef.current) {
       handleConnect();
@@ -110,20 +133,27 @@ export function useMobileSocket({
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("game-result", handleGameResult);
+      socket.off("aim-off", handleAimOff);
     };
   }, [room, name, enabled, slot]);
+
+  const leaveJoinedRooms = useCallback((reason: string) => {
+    if (!socket.connected) return;
+    const joinedRooms = Array.from(joinedRoomsRef.current);
+    joinedRooms.forEach((joinedRoom) => {
+      debugLog(`[Socket] leaveRoom (${reason}): ${joinedRoom}`);
+      socket.emit("leaveRoom", { room: joinedRoom });
+    });
+  }, []);
 
   // unmount 시 정리
   useEffect(() => {
     return () => {
-      if (socket.connected && currentRoomRef.current) {
-        debugLog(`[Socket] leaveRoom (unmount): ${currentRoomRef.current}`);
-        socket.emit("leaveRoom", { room: currentRoomRef.current });
-      }
+      leaveJoinedRooms("unmount");
       hasJoinedRef.current = false;
       currentRoomRef.current = "";
     };
-  }, []);
+  }, [leaveJoinedRooms]);
 
   const emitAimUpdate = useCallback(
     (aim: { x: number; y: number }, skin?: string) => {
@@ -156,7 +186,7 @@ export function useMobileSocket({
       throwCountRef.current += 1;
 
       if (throwCountRef.current >= 3) {
-        socket.emit("aim-off", { room: playerRoom, name });
+        socket.emit("aim-off", { room: playerRoom, socketId: socket.id, name });
         throwCountRef.current = 3;
       }
     },
@@ -170,21 +200,23 @@ export function useMobileSocket({
   }, [room, name]);
 
   const leaveGame = useCallback(() => {
-    if (socket.connected && currentRoomRef.current) {
-      debugLog(`[Socket] leaveRoom: ${currentRoomRef.current}`);
-      socket.emit("leaveRoom", { room: currentRoomRef.current });
-      socket.emit("aim-off", {
-        room: currentRoomRef.current,
-        socketId: socket.id,
-        name,
-      });
+    if (socket.connected) {
+      leaveJoinedRooms("game exit");
+      if (currentRoomRef.current) {
+        socket.emit("aim-off", {
+          room: currentRoomRef.current,
+          socketId: socket.id,
+          name,
+        });
+      }
     }
 
     throwCountRef.current = 0;
     hasJoinedRef.current = false;
     currentRoomRef.current = "";
+    joinedRoomsRef.current.clear();
     slotRef.current = null;
-  }, [name]);
+  }, [leaveJoinedRooms, name]);
 
   return {
     emitAimUpdate,

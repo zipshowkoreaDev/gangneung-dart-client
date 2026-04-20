@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useMobileSocket } from "./hooks/useMobileSocket";
 import { useGyroscope } from "./hooks/useGyroscope";
 import { getQRSession } from "@/lib/session";
@@ -36,12 +36,48 @@ export default function MobilePage() {
   const [hasJoined, setHasJoined] = useState(false);
   const [assignedSlot, setAssignedSlot] = useState<PlayerSlot | null>(null);
   const [startError, setStartError] = useState("");
+  const [gamePlayers, setGamePlayers] = useState<string[]>([]);
+  const [finishedPlayers, setFinishedPlayers] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [winner, setWinner] = useState<{ name: string; score: number } | null>(
+    null
+  );
+  const [endCountdown, setEndCountdown] = useState<number | null>(null);
 
-  const { emitAimUpdate, emitAimOff, emitThrowDart, leaveGame } = useMobileSocket({
+  const handlePlayerFinished = useCallback((playerId: string) => {
+    setFinishedPlayers((prev) => {
+      if (prev.has(playerId)) return prev;
+      const next = new Set(prev);
+      next.add(playerId);
+      return next;
+    });
+  }, []);
+
+  const handleGameResult = useCallback(
+    (data: {
+      ranking?: Array<{ name: string; score: number; rank?: number }>;
+    }) => {
+      const topPlayer = data.ranking?.[0];
+      if (!topPlayer) return;
+      setWinner({ name: topPlayer.name, score: topPlayer.score });
+    },
+    []
+  );
+
+  const {
+    emitAimUpdate,
+    emitAimOff,
+    emitThrowDart,
+    leaveGame,
+    socketId,
+  } = useMobileSocket({
     room,
     name: socketName,
     enabled: hasJoined,
     slot: assignedSlot,
+    onPlayerFinished: handlePlayerFinished,
+    onGameResult: handleGameResult,
   });
 
   const {
@@ -75,18 +111,15 @@ export default function MobilePage() {
     room,
     name: socketName,
     isInGame,
-    startSensors,
     setAssignedSlot,
     setHasJoined,
     setIsInGame,
+    setGamePlayers,
   });
 
   usePageLeave({ joinedQueueRef });
 
   useGameLifecycle({
-    hasFinishedTurn,
-    isInQueue,
-    leaveQueue,
     stopSensors,
   });
 
@@ -108,6 +141,58 @@ export default function MobilePage() {
     setHasJoined,
     startSensors,
   });
+
+  const myPlayerIndex = useMemo(
+    () => (socketId ? gamePlayers.indexOf(socketId) : -1),
+    [gamePlayers, socketId]
+  );
+  const myTurn =
+    isInGame &&
+    !hasFinishedTurn &&
+    myPlayerIndex >= 0 &&
+    gamePlayers
+      .slice(0, myPlayerIndex)
+      .every((playerId) => finishedPlayers.has(playerId));
+  const gameFinished =
+    isInGame &&
+    gamePlayers.length > 0 &&
+    gamePlayers.every((playerId) => finishedPlayers.has(playerId));
+
+  useEffect(() => {
+    if (!socketId || !hasFinishedTurn) return;
+    const timer = window.setTimeout(() => handlePlayerFinished(socketId), 0);
+    return () => window.clearTimeout(timer);
+  }, [socketId, hasFinishedTurn, handlePlayerFinished]);
+
+  useEffect(() => {
+    if (!myTurn || sensorsReady) return;
+    startSensors();
+  }, [myTurn, sensorsReady, startSensors]);
+
+  useEffect(() => {
+    if (!gameFinished || endCountdown !== null) return;
+    const timer = window.setTimeout(() => setEndCountdown(10), 0);
+    return () => window.clearTimeout(timer);
+  }, [gameFinished, endCountdown]);
+
+  useEffect(() => {
+    if (endCountdown === null) return;
+    if (endCountdown <= 0) {
+      const timer = window.setTimeout(() => {
+        handleExit();
+        setGamePlayers([]);
+        setFinishedPlayers(new Set());
+        setWinner(null);
+        setEndCountdown(null);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+    const timer = window.setTimeout(
+      () => setEndCountdown((prev) => (prev === null ? null : prev - 1)),
+      1000
+    );
+    return () => window.clearTimeout(timer);
+  }, [endCountdown, handleExit]);
 
   const handleNameChange = useCallback(
     (value: string) => {
@@ -151,11 +236,27 @@ export default function MobilePage() {
         />
       )}
 
-      {sessionValid === true && hasFinishedTurn && (
-        <ResultScreen name={customName} score={myScore} onExit={handleExit} />
+      {sessionValid === true && hasFinishedTurn && !gameFinished && (
+        <ResultScreen
+          name={customName}
+          score={myScore}
+          onExit={handleExit}
+          isWaiting
+        />
       )}
 
-      {sessionValid === true && !hasFinishedTurn && isInGame && (
+      {sessionValid === true && gameFinished && (
+        <ResultScreen
+          name={customName}
+          score={myScore}
+          onExit={handleExit}
+          countdown={endCountdown}
+          winnerName={winner?.name}
+          winnerScore={winner?.score}
+        />
+      )}
+
+      {sessionValid === true && !hasFinishedTurn && isInGame && myTurn && (
         <GameScreen
           aimPosition={aimPosition}
           throwsLeft={throwsLeft}
@@ -163,6 +264,13 @@ export default function MobilePage() {
           sensorError={sensorError}
           onRequestPermission={handleRequestPermission}
           onCalibrate={calibrate}
+        />
+      )}
+
+      {sessionValid === true && !hasFinishedTurn && isInGame && !myTurn && (
+        <QueueLoading
+          title="차례 대기 중"
+          message="앞 플레이어의 투구가 끝나면 자동으로 시작됩니다."
         />
       )}
 

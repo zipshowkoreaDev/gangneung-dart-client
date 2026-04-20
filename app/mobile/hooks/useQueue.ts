@@ -12,7 +12,7 @@ interface UseQueueProps {
   room: string;
   name: string;
   isInGame: boolean;
-  onEnterGame: (slot: PlayerSlot) => void;
+  onEnterGame: (slot: PlayerSlot, players: string[]) => void;
 }
 
 interface UseQueueReturn {
@@ -45,6 +45,7 @@ export function useQueue({
   const approvalTimeoutRef = useRef<number | null>(null);
   const approvalIntervalRef = useRef<number | null>(null);
   const pendingSlotRef = useRef<PlayerSlot | null>(null);
+  const pendingPlayersRef = useRef<string[]>([]);
   const lastJoinedSocketIdRef = useRef<string | null>(null);
 
   const clearApprovalWait = useCallback(() => {
@@ -58,6 +59,7 @@ export function useQueue({
     }
     approvalStartAtRef.current = null;
     pendingSlotRef.current = null;
+    pendingPlayersRef.current = [];
     setApprovalRemainingSeconds(null);
   }, []);
 
@@ -107,10 +109,12 @@ export function useQueue({
       return idx >= 0 ? idx : -1;
     };
 
-    const enterGame = (slot: PlayerSlot) => {
+    const getGamePlayers = (queue: string[]) => queue.slice(0, MAX_PLAYERS);
+
+    const enterGame = (slot: PlayerSlot, players: string[]) => {
       clearApprovalWait();
       debugLog(`[Queue] 게임 시작 승인, 슬롯: ${slot}`);
-      onEnterGame(slot);
+      onEnterGame(slot, players);
     };
 
     const updateApprovalCountdown = () => {
@@ -120,8 +124,9 @@ export function useQueue({
       setApprovalRemainingSeconds(Math.ceil(remaining / 1000));
     };
 
-    const waitForAutoApproval = (slot: PlayerSlot) => {
+    const waitForAutoApproval = (slot: PlayerSlot, players: string[]) => {
       pendingSlotRef.current = slot;
+      pendingPlayersRef.current = players;
 
       if (!approvalStartAtRef.current) {
         approvalStartAtRef.current = Date.now();
@@ -143,7 +148,7 @@ export function useQueue({
         approvalTimeoutRef.current = window.setTimeout(() => {
           const approvedSlot = pendingSlotRef.current;
           if (approvedSlot && !isInGame) {
-            enterGame(approvedSlot);
+            enterGame(approvedSlot, pendingPlayersRef.current);
           }
         }, remaining);
       }
@@ -179,12 +184,12 @@ export function useQueue({
       if (slot && !isInGame) {
         if (uniqueQueue.length >= MAX_PLAYERS) {
           debugLog(`[Queue] 4명 충족 - 즉시 시작, 슬롯: ${slot}`);
-          enterGame(slot);
+          enterGame(slot, getGamePlayers(uniqueQueue));
           return;
         }
 
         debugLog(`[Queue] 자동 승인 대기 중, 슬롯: ${slot}`);
-        waitForAutoApproval(slot);
+        waitForAutoApproval(slot, getGamePlayers(uniqueQueue));
         return;
       }
 
