@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import useDisplayState from "@/hooks/useDisplayState";
+import useDisplayState from "@/app/display/hooks/useDisplayState";
 
 describe("hooks/useDisplayState", () => {
   describe("초기 상태", () => {

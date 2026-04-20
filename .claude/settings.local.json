@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -i 's|from \"@/three/Scene\"|from \"../three/Scene\"|g' /mnt/d/gangneung-dart/app/display/hooks/useDisplayQrUrl.ts)",
+      "Bash(sed -i 's|from \"@/three/Scene\"|from \"../three/Scene\"|g' /mnt/d/gangneung-dart/app/display/hooks/useDisplaySocket.ts)",
+      "Bash(sed -i 's|from \"@/three/Scene\"|from \"../three/Scene\"|g' /mnt/d/gangneung-dart/app/display/components/DartCanvas.tsx)"
+    ]
+  }
+}

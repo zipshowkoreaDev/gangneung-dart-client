@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import profanityList from "@/constants/profanity.json";
+import profanityList from "@/lib/constants/profanity.json";
 import { createProfanityChecker } from "@/lib/profanityCheckCore.js";
 
 const checker = createProfanityChecker(profanityList);

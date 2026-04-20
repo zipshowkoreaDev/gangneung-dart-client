@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { generateSessionToken } from "@/lib/session";
-import { getRouletteRadius } from "@/three/Scene";
+import { getRouletteRadius } from "../three/Scene";
 
-const ROOM = "zipshow";
+const ROOM = process.env.NEXT_PUBLIC_ROOM ?? "zipshow";
 
 export default function useDisplayQrUrl(): string {
   const tokenRef = useRef<string | null>(null);

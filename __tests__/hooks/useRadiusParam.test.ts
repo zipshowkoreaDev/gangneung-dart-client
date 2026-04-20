@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
-import useRadiusParam from "@/hooks/useRadiusParam";
+import useRadiusParam from "@/app/mobile/hooks/useRadiusParam";
 
 describe("hooks/useRadiusParam", () => {
   const originalLocation = window.location;

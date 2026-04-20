@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useSlotManager } from "@/hooks/useSlotManager";
+import { useSlotManager } from "@/app/mobile/hooks/useSlotManager";
 
 describe("hooks/useSlotManager", () => {
   describe("초기 상태", () => {

@@ -1,4 +1,4 @@
-const DEFAULT_ROOM = "zipshow";
+const DEFAULT_ROOM = process.env.NEXT_PUBLIC_ROOM ?? "zipshow";
 const MAX_PLAYERS = 2;
 
 export function getRoomFromUrl(): string {
@@ -125,4 +125,12 @@ export function clearAllSlots(room: string): void {
   if (typeof window === "undefined") return;
   const key = `slots_${room}`;
   localStorage.removeItem(key);
+}
+
+export function createRoom(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from(
+    { length: 4 },
+    () => chars[Math.floor(Math.random() * chars.length)]
+  ).join("");
 }

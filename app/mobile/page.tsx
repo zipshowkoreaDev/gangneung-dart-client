@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useMobileSocket } from "@/hooks/useMobileSocket";
-import { useGyroscope } from "@/hooks/useGyroscope";
+import { useMobileSocket } from "./hooks/useMobileSocket";
+import { useGyroscope } from "./hooks/useGyroscope";
 import { getQRSession } from "@/lib/session";
 import { getRoomFromUrl } from "@/lib/room";
 import { usePageLeave } from "./hooks/usePageLeave";
-import useNameInputFlow from "@/hooks/useNameInputFlow";
-import useGameLifecycle from "@/hooks/useGameLifecycle";
-import useRadiusParam from "@/hooks/useRadiusParam";
-import useQueueSessionFlow from "@/hooks/useQueueSessionFlow";
-import useStartExitFlow from "@/hooks/useStartExitFlow";
+import useNameInputFlow from "./hooks/useNameInputFlow";
+import useGameLifecycle from "./hooks/useGameLifecycle";
+import useRadiusParam from "./hooks/useRadiusParam";
+import useQueueSessionFlow from "./hooks/useQueueSessionFlow";
+import useStartExitFlow from "./hooks/useStartExitFlow";
 import SessionValidating from "./components/SessionValidating";
 import AccessDenied from "./components/AccessDenied";
 import NameInput from "./components/NameInput";

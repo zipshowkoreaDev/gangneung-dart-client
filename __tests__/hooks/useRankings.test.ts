@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import useRankings from "@/hooks/useRankings";
+import useRankings from "@/app/display/hooks/useRankings";
 import { clearRankings, addRanking } from "@/lib/ranking";
 
 describe("hooks/useRankings", () => {

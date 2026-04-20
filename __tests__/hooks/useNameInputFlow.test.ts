@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import useNameInputFlow from "@/hooks/useNameInputFlow";
+import useNameInputFlow from "@/app/mobile/hooks/useNameInputFlow";
 
 describe("hooks/useNameInputFlow", () => {
   describe("초기 상태", () => {

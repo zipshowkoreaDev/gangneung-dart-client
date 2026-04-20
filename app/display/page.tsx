@@ -1,19 +1,19 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useDisplaySocket } from "@/hooks/useDisplaySocket";
+import { useDisplaySocket } from "./hooks/useDisplaySocket";
 import Scoreboard from "./components/Scoreboard";
 import AimOverlay from "./components/AimOverlay";
 import RankingBoard from "./components/RankingBoard";
-import useDisplayQrUrl from "@/hooks/useDisplayQrUrl";
-import useRankings from "@/hooks/useRankings";
-import useDisplayState from "@/hooks/useDisplayState";
+import useDisplayQrUrl from "./hooks/useDisplayQrUrl";
+import useRankings from "./hooks/useRankings";
+import useDisplayState from "./hooks/useDisplayState";
 const DisplayQRCode = dynamic(() => import("./components/DisplayQRCode"), {
   ssr: false,
 });
 import DartCanvas from "./components/DartCanvas";
 
-const ROOM = "zipshow";
+const ROOM = process.env.NEXT_PUBLIC_ROOM ?? "zipshow";
 
 export default function DisplayPage() {
   const {

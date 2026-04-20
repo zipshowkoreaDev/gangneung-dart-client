@@ -1,5 +1,5 @@
 import { Canvas } from "@react-three/fiber";
-import Scene from "@/three/Scene";
+import Scene from "../three/Scene";
 import { DISPLAY_CANVAS_Y_OFFSET } from "@/lib/displayLayout";
 
 // 다트 게임 3D Canvas 컴포넌트

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import useProfanityCheck from "@/hooks/useProfanityCheck";
+import useProfanityCheck from "./useProfanityCheck";
 
 type UseNameInputFlowReturn = {
   name: string;

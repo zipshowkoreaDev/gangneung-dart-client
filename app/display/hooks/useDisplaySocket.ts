@@ -7,7 +7,7 @@ import {
 } from "react";
 import { socket } from "@/shared/socket";
 import { getDisplayRoom, getAllPlayerRooms } from "@/lib/room";
-import { getRouletteRadius } from "@/three/Scene";
+import { getRouletteRadius } from "../three/Scene";
 import {
   clamp,
   getHitScoreFromAim as getHitScoreFromAimBase,
