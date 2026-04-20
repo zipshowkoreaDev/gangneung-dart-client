@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useMobileSocket } from "./hooks/useMobileSocket";
 import { useGyroscope } from "./hooks/useGyroscope";
 import { getQRSession } from "@/lib/session";
-import { getRoomFromUrl } from "@/lib/room";
+import { getRoomFromUrl, MAX_PLAYERS, type PlayerSlot } from "@/lib/room";
 import { usePageLeave } from "./hooks/usePageLeave";
 import useNameInputFlow from "./hooks/useNameInputFlow";
 import useGameLifecycle from "./hooks/useGameLifecycle";
@@ -34,8 +34,7 @@ export default function MobilePage() {
   const rouletteRadius = useRadiusParam();
   const [isInGame, setIsInGame] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
-  const [assignedSlot, setAssignedSlot] = useState<1 | 2 | null>(null);
-  const [isInQueue, setIsInQueue] = useState(false);
+  const [assignedSlot, setAssignedSlot] = useState<PlayerSlot | null>(null);
   const [startError, setStartError] = useState("");
 
   const { emitAimUpdate, emitAimOff, emitThrowDart, leaveGame } = useMobileSocket({
@@ -65,8 +64,10 @@ export default function MobilePage() {
   });
 
   const {
+    isInQueue,
     queuePosition,
     queueSnapshot,
+    approvalRemainingSeconds,
     joinedQueueRef,
     connectAndJoinQueue,
     leaveQueue,
@@ -78,7 +79,6 @@ export default function MobilePage() {
     setAssignedSlot,
     setHasJoined,
     setIsInGame,
-    setIsInQueue,
   });
 
   usePageLeave({ joinedQueueRef });
@@ -118,7 +118,14 @@ export default function MobilePage() {
   );
 
   const isWaitingInQueue =
-    isInQueue && !isInGame && queuePosition !== null && queuePosition >= 2;
+    isInQueue && !isInGame && queuePosition !== null && queuePosition >= MAX_PLAYERS;
+  const isWaitingForApproval =
+    isInQueue &&
+    !isInGame &&
+    queuePosition !== null &&
+    queuePosition >= 0 &&
+    queuePosition < MAX_PLAYERS &&
+    approvalRemainingSeconds !== null;
   return (
     <div className="h-screen flex flex-col items-center justify-center gap-8 bg-gradient-to-br from-[#1e3c72] to-[#2a5298] px-5">
       <DebugOverlay />
@@ -127,8 +134,20 @@ export default function MobilePage() {
 
       {sessionValid === true && isWaitingInQueue && (
         <WaitingScreen
-          aheadCount={queuePosition !== null ? Math.max(0, queuePosition - 2) : null}
+          aheadCount={
+            queuePosition !== null
+              ? Math.max(0, queuePosition - MAX_PLAYERS)
+              : null
+          }
           queue={queueSnapshot}
+        />
+      )}
+
+      {sessionValid === true && isWaitingForApproval && (
+        <QueueLoading
+          title="플레이어 참여 대기 중"
+          message={`${MAX_PLAYERS}명이 모이면 바로 시작합니다. 모이지 않으면 30초 후 자동 시작됩니다.`}
+          remainingSeconds={approvalRemainingSeconds}
         />
       )}
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { MAX_PLAYERS } from "@/lib/room";
+
 type PlayerScore = {
   socketId?: string;
   name: string;
@@ -18,9 +20,7 @@ export default function Scoreboard({
   players,
 }: ScoreboardProps) {
   const playerList = Array.from(players.values());
-  const playerOne = playerList[0];
-  const playerTwo = playerList[1];
-  const slots = [playerOne, playerTwo];
+  const slots = Array.from({ length: MAX_PLAYERS }, (_, index) => playerList[index]);
 
   const renderPlayerCard = (player: PlayerScore | undefined) => {
     return (
@@ -35,7 +35,7 @@ export default function Scoreboard({
           {player?.score ? `${player?.score} 점` : ""}
         </div>
         <div className="text-[0.75rem] opacity-70">
-          {player ? `남은 기회: ${3 - player.totalThrows}` : ""}
+          {player ? `남은 기회: ${Math.max(0, 3 - player.totalThrows)}` : ""}
         </div>
       </div>
     );

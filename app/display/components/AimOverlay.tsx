@@ -1,7 +1,6 @@
 "use client";
 
-import { ZONE_RATIOS } from "@/lib/score";
-import { DISPLAY_AIM_BOUNDS, getDisplayAimBounds } from "@/lib/displayAimBounds";
+import { getDisplayAimBounds } from "@/lib/displayAimBounds";
 import { DISPLAY_CANVAS_Y_OFFSET } from "@/lib/displayLayout";
 
 type AimPosition = {
@@ -18,8 +17,8 @@ type AimOverlayProps = {
 
 function resolveColor(playerKey: string, playerOrder: string[]) {
   const index = playerOrder.indexOf(playerKey);
-  // 첫 번째 플레이어: 빨강, 두 번째 플레이어: 파랑
-  return index === 0 ? "#ff4d4d" : "#4da3ff";
+  const colors = ["#ff4d4d", "#4da3ff", "#ffd54f", "#66bb6a"];
+  return colors[index] ?? "#ffffff";
 }
 
 export default function AimOverlay({
@@ -28,59 +27,10 @@ export default function AimOverlay({
   players,
 }: AimOverlayProps) {
   const bounds = getDisplayAimBounds();
-  const boundsStyle = {
-    position: "absolute" as const,
-    left: `${DISPLAY_AIM_BOUNDS.centerX * 100}%`,
-    top: `${DISPLAY_AIM_BOUNDS.centerY * 100}%`,
-    transform: "translate(-50%, -50%)",
-    height: `${DISPLAY_AIM_BOUNDS.height * 100}%`,
-    aspectRatio: `${DISPLAY_AIM_BOUNDS.aspect} / 1`,
-    pointerEvents: "none" as const,
-  };
-
-  const zoneRings = [
-    { ratio: ZONE_RATIOS.BULL, color: "#ff4d4d" },
-    { ratio: ZONE_RATIOS.INNER_SINGLE, color: "#ffd54f" },
-    { ratio: ZONE_RATIOS.TRIPLE, color: "#4caf50" },
-    { ratio: ZONE_RATIOS.OUTER_SINGLE, color: "#ffa726" },
-    { ratio: ZONE_RATIOS.DOUBLE, color: "#42a5f5" },
-  ];
 
   return (
     <>
-      {/*
-      <div style={{ ...boundsStyle, zIndex: 1 }}>
-        {zoneRings.map((ring) => (
-          <div
-            key={ring.ratio}
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: "55.5%",
-              transform: "translate(-50%, -50%)",
-              width: `${ring.ratio * 80}%`,
-              borderRadius: "50%",
-              border: `2px solid ${ring.color}`,
-              boxSizing: "border-box",
-              aspectRatio: "1/1",
-            }}
-          />
-        ))}
-      </div>
-      <div
-        style={{
-          ...boundsStyle,
-          border: "4px solid #ff3b3b",
-          zIndex: 2,
-          boxSizing: "border-box",
-        }}
-      />
-      */}
       {Array.from(aimPositions.entries())
-        .filter(([]) => {
-          // 모든 플레이어의 조준점 표시
-          return true;
-        })
         .map(([playerKey, pos]) => {
           // -1..1 → 0..1
           const x01 = (pos.x + 1) / 2;

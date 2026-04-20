@@ -58,7 +58,7 @@ npm run dev
 ### 모바일
 
 ```
-이름 입력 → 모션 권한 → 수평 체크(±5°, 1초 유지) → 대기열(join-queue) → 슬롯 배정 → 게임 방 입장(joinRoom)
+이름 입력 → 모션 권한 → 수평 체크(±5°, 1초 유지) → 대기열(join-queue) → 슬롯 배정/자동 승인 → 게임 방 입장(joinRoom)
          → 조준(aim-update) → 던짐(throw-dart) → 종료(aim-off)
 ```
 
@@ -88,25 +88,17 @@ npm run dev
 
 ## 슬롯 시스템
 
-- 동시 플레이어 최대 **2명** 제한
-- 순서대로 slot 1, slot 2에 할당 (나가면 해당 자리만 비워짐, 재배치 없음)
-- localStorage 기반 슬롯 관리 (1분 후 자동 만료)
+- 동시 플레이어 최대 **4명** 제한
+- 순서대로 slot 1~4에 할당 (나가면 해당 자리만 비워짐, 재배치 없음)
+- 슬롯 배정 대상이 4명 미만이면 30초 후 자동 승인, 4명이 모이면 즉시 시작
+- 소켓 대기열 순서 기준으로 슬롯 배정
 
 ### 방 이름 규칙
 
 | 유형 | 형식 | 예시 |
 |------|------|------|
-| 플레이어 방 | `game-{room}-player{1\|2}` | `game-zipshow-player1` |
+| 플레이어 방 | `game-{room}-player{1~4}` | `game-zipshow-player1` |
 | 디스플레이 방 | `game-{room}-display` | `game-zipshow-display` |
-
-### 슬롯 매니저
-
-| 대상 | 파일 | 방식 |
-|------|------|------|
-| 모바일 | `lib/room.ts` | localStorage 기반, URL 파라미터로 슬롯 전달 |
-| 디스플레이 | `hooks/useSlotManager.ts` | React 상태 기반, 실시간 할당/해제 |
-
----
 
 ## 안정화 처리 (클라이언트)
 

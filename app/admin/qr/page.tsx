@@ -10,7 +10,6 @@ const FIXED_ROOM = "zipshow";
 interface QRData {
   url: string;
   createdAt: number;
-  slot: 1 | 2;
 }
 
 export default function AdminQRPage() {
@@ -25,7 +24,7 @@ export default function AdminQRPage() {
       }
     }
     const url = `${baseUrl}/auth/${token}?${params.toString()}`;
-    return { url, createdAt, slot: 1 };
+    return { url, createdAt };
   };
 
   const [qrCode, setQrCode] = useState<QRData | null>(() => {

@@ -2,6 +2,15 @@ import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import useDisplayState from "@/app/display/hooks/useDisplayState";
 
+const createPlayer = (name = "홍길동") => ({
+  name,
+  score: 0,
+  isConnected: true,
+  isReady: true,
+  totalThrows: 0,
+  currentThrows: 0,
+});
+
 describe("hooks/useDisplayState", () => {
   describe("초기 상태", () => {
     it("aimPositions는 빈 Map", () => {
@@ -91,11 +100,7 @@ describe("hooks/useDisplayState", () => {
       act(() => {
         result.current.setPlayers((prev) => {
           const next = new Map(prev);
-          next.set("player1", {
-            name: "홍길동",
-            score: 0,
-            throwsLeft: 3,
-          });
+          next.set("player1", createPlayer());
           return next;
         });
       });
@@ -110,11 +115,7 @@ describe("hooks/useDisplayState", () => {
       act(() => {
         result.current.setPlayers((prev) => {
           const next = new Map(prev);
-          next.set("player1", {
-            name: "홍길동",
-            score: 0,
-            throwsLeft: 3,
-          });
+          next.set("player1", createPlayer());
           return next;
         });
       });
@@ -139,7 +140,7 @@ describe("hooks/useDisplayState", () => {
       act(() => {
         result.current.setPlayers((prev) => {
           const next = new Map(prev);
-          next.set("player1", { name: "홍길동", score: 0, throwsLeft: 3 });
+          next.set("player1", createPlayer());
           return next;
         });
       });

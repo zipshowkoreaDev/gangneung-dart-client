@@ -1,13 +1,13 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { socket } from "@/shared/socket";
-import { getPlayerRoom } from "@/lib/room";
+import { getPlayerRoom, type PlayerSlot } from "@/lib/room";
 import { debugLog } from "@/app/mobile/components/DebugOverlay";
 
 interface UseMobileSocketProps {
   room: string;
   name: string;
   enabled: boolean;
-  slot: 1 | 2 | null;
+  slot: PlayerSlot | null;
   onGameResult?: (data: GameResultPayload) => void;
 }
 
@@ -44,7 +44,7 @@ export function useMobileSocket({
   const throwCountRef = useRef(0);
   const hasJoinedRef = useRef(false);
   const currentRoomRef = useRef<string>("");
-  const slotRef = useRef<1 | 2 | null>(null);
+  const slotRef = useRef<PlayerSlot | null>(null);
 
   const onGameResultRef = useRef(onGameResult);
   useEffect(() => {

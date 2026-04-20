@@ -1,54 +1,9 @@
 "use client";
 
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-
-export type HitZone = "bull" | "single" | "triple" | "double" | "miss";
-
-interface HitResult {
-  zone: HitZone;
-  score: number;
-}
-
-// 다트판 구역 비율 (중심 기준)
-const ZONE_RATIOS = {
-  BULL: 0.08,
-  INNER_SINGLE: 0.47,
-  TRIPLE: 0.54,
-  OUTER_SINGLE: 0.93,
-  DOUBLE: 1.0,
-};
-
-const SCORES = {
-  BULL: 50,
-  SINGLE: 10,
-  TRIPLE: 30,
-  DOUBLE: 20,
-  MISS: 0,
-};
-
-function getHitResult(distance: number, rouletteRadius: number): HitResult {
-  const ratio = distance / rouletteRadius;
-
-  if (ratio <= ZONE_RATIOS.BULL) {
-    return { zone: "bull", score: SCORES.BULL };
-  }
-  if (ratio <= ZONE_RATIOS.INNER_SINGLE) {
-    return { zone: "single", score: SCORES.SINGLE };
-  }
-  if (ratio <= ZONE_RATIOS.TRIPLE) {
-    return { zone: "triple", score: SCORES.TRIPLE };
-  }
-  if (ratio <= ZONE_RATIOS.OUTER_SINGLE) {
-    return { zone: "single", score: SCORES.SINGLE };
-  }
-  if (ratio <= ZONE_RATIOS.DOUBLE) {
-    return { zone: "double", score: SCORES.DOUBLE };
-  }
-  return { zone: "miss", score: SCORES.MISS };
-}
 
 interface StuckDartProps {
   position: [number, number, number];
@@ -149,7 +104,7 @@ function Roulette({
 }) {
   const { scene } = useGLTF("/models/roulette.glb");
 
-  useMemo(() => {
+  useEffect(() => {
     const box = new THREE.Box3().setFromObject(scene);
     const size = box.getSize(new THREE.Vector3());
     cachedRouletteRadius = Math.max(size.x, size.y) / 2;
