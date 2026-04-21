@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import useRankings from "@/app/display/hooks/useRankings";
 import { clearRankings, addRanking } from "@/lib/ranking";
@@ -6,6 +6,10 @@ import { clearRankings, addRanking } from "@/lib/ranking";
 describe("hooks/useRankings", () => {
   beforeEach(() => {
     clearRankings();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("초기 상태", () => {
@@ -132,6 +136,25 @@ describe("hooks/useRankings", () => {
 
       expect(result2.current.rankings).toHaveLength(1);
       expect(result2.current.rankings[0].name).toBe("홍길동");
+    });
+
+    it("자정을 넘기면 화면 랭킹 상태 초기화", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2024, 0, 1, 23, 59, 59));
+
+      const { result } = renderHook(() => useRankings());
+
+      act(() => {
+        result.current.handlePlayerFinish("홍길동", 100);
+      });
+
+      expect(result.current.rankings).toHaveLength(1);
+
+      act(() => {
+        vi.advanceTimersByTime(2 * 1000);
+      });
+
+      expect(result.current.rankings).toEqual([]);
     });
   });
 });

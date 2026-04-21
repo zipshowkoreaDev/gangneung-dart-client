@@ -1,9 +1,18 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getRankings, addRanking, clearRankings } from "@/lib/ranking";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  getRankings,
+  addRanking,
+  clearRankings,
+  getMillisecondsUntilRankingReset,
+} from "@/lib/ranking";
 
 describe("lib/ranking", () => {
   beforeEach(() => {
     clearRankings();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("getRankings", () => {
@@ -19,6 +28,18 @@ describe("lib/ranking", () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe("홍길동");
       expect(result[0].score).toBe(100);
+    });
+
+    it("R-1-3: 날짜가 바뀌면 랭킹 초기화", () => {
+      vi.useFakeTimers();
+
+      vi.setSystemTime(new Date(2024, 0, 1, 23, 59, 0));
+      addRanking("홍길동", 100);
+
+      vi.setSystemTime(new Date(2024, 0, 2, 0, 0, 0));
+      const result = getRankings();
+
+      expect(result).toEqual([]);
     });
   });
 
@@ -67,6 +88,29 @@ describe("lib/ranking", () => {
 
       expect(result[0].name).toBe("Second");
       expect(result[1].name).toBe("First");
+    });
+
+    it("R-2-5: 날짜가 바뀐 뒤 추가하면 새 날짜 랭킹만 유지", () => {
+      vi.useFakeTimers();
+
+      vi.setSystemTime(new Date(2024, 0, 1, 23, 59, 0));
+      addRanking("Yesterday", 100);
+
+      vi.setSystemTime(new Date(2024, 0, 2, 0, 0, 0));
+      const result = addRanking("Today", 50);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("Today");
+      expect(result[0].score).toBe(50);
+    });
+  });
+
+  describe("getMillisecondsUntilRankingReset", () => {
+    it("R-4-1: 다음 자정까지 남은 시간 반환", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2024, 0, 1, 23, 59, 0));
+
+      expect(getMillisecondsUntilRankingReset()).toBe(60 * 1000);
     });
   });
 
