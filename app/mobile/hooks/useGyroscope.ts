@@ -98,7 +98,7 @@ export function useGyroscope({
   const [sensorError, setSensorError] = useState("");
   const [throwsLeft, setThrowsLeft] = useState(3);
   const [hasFinishedTurn, setHasFinishedTurn] = useState(false);
-  const [myScore, setMyScore] = useState(0);
+  const [totalScore, setTotalScore] = useState(0);
 
   const sensorsActiveRef = useRef(false);
   const lastAimSentRef = useRef(0);
@@ -188,7 +188,7 @@ export function useGyroscope({
     setSensorsReady(true);
     setHasFinishedTurn(false);
     setThrowsLeft(3);
-    setMyScore(0);
+    setTotalScore(0);
     throwCountRef.current = 0;
     throwBlockedUntilRef.current = 0;
     isTrackingRef.current = false;
@@ -248,7 +248,7 @@ export function useGyroscope({
           throwBlockedUntilRef.current = now + THROW_COOL_DOWN_MS;
 
           const hitResult = getHitResult(aimRef.current, currentRouletteRadius);
-          setMyScore(hitResult.score);
+          setTotalScore((prev) => prev + hitResult.score);
 
           emitThrowDart({
             aim: aimRef.current,
@@ -288,7 +288,7 @@ export function useGyroscope({
     sensorError,
     throwsLeft,
     hasFinishedTurn,
-    myScore,
+    totalScore,
     startSensors,
     stopSensors,
     requestMotionPermission,

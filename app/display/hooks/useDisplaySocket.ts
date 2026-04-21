@@ -328,7 +328,7 @@ export function useDisplaySocket({
       if (player) {
         const newCurrentThrows = player.currentThrows + 1;
         const isLastThrow = newCurrentThrows >= 3;
-        const newScore = score;
+        const newScore = player.score + score;
 
         // React 상태 반영 전 onAimOff가 먼저 실행되는 경쟁 조건 방지
         playerLastScoresRef.current.set(key, { name: player.name, score: newScore });
@@ -342,7 +342,7 @@ export function useDisplaySocket({
         playersRef.current = nextPlayers;
         setPlayers(nextPlayers);
         onLog?.(
-          `Score: ${player.name} ${player.score} -> ${newScore} (Throw ${newCurrentThrows}/3)`
+          `Score: ${player.name} ${player.score} + ${score} = ${newScore} (Throw ${newCurrentThrows}/3)`
         );
       }
 

@@ -70,7 +70,7 @@ export default function MobilePage() {
     sensorError,
     throwsLeft,
     hasFinishedTurn,
-    myScore,
+    totalScore,
     startSensors,
     stopSensors,
     requestMotionPermission,
@@ -227,7 +227,7 @@ export default function MobilePage() {
       {sessionValid === true && gameFinished && (
         <ResultScreen
           name={customName}
-          score={myScore}
+          score={totalScore}
           onExit={handleExit}
           countdown={endCountdown}
         />
