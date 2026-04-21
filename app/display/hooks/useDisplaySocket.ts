@@ -68,6 +68,16 @@ function stripDisplayName(name: string) {
   return base || name;
 }
 
+function buildRanking(players: PlayerScore[]) {
+  return [...players]
+    .sort((a, b) => b.score - a.score)
+    .map((player, index) => ({
+      name: player.name,
+      score: player.score,
+      rank: index + 1,
+    }));
+}
+
 export function useDisplaySocket({
   room,
   onLog,
@@ -325,35 +335,34 @@ export function useDisplaySocket({
         const finishedName = tracked?.name ?? basePlayer?.name;
         const finishedScore = tracked?.score ?? basePlayer?.score ?? 0;
         playerScoresRef.current.delete(key);
-        let finishedPlayers: PlayerScore[] | null = null;
+        const nextPlayers = new Map(playersRef.current);
+        const player = nextPlayers.get(key);
+        if (player) {
+          nextPlayers.set(key, {
+            ...player,
+            score: finishedScore,
+            isConnected: false,
+            isReady: false,
+            totalThrows: Math.max(player.totalThrows, 3),
+            currentThrows: 0,
+          });
+          onLog?.(`Aim off: ${key}`);
+        }
 
-        setPlayers((prev) => {
-          const next = new Map(prev);
-          const player = prev.get(key);
-          if (player) {
-            next.set(key, {
-              ...player,
-              score: finishedScore,
-              isConnected: false,
-              isReady: false,
-              totalThrows: Math.max(player.totalThrows, 3),
-              currentThrows: 0,
-            });
-            onLog?.(`Aim off: ${key}`);
-          }
-          const registeredPlayers = Array.from(next.values()).filter(
-            (registeredPlayer) => registeredPlayer.slot
-          );
-          const everyRegisteredPlayerFinished =
-            registeredPlayers.length > 0 &&
-            registeredPlayers.every(
-              (registeredPlayer) => registeredPlayer.totalThrows >= 3
-            );
-          if (everyRegisteredPlayerFinished) {
-            finishedPlayers = registeredPlayers;
-          }
-          return next;
-        });
+        playersRef.current = nextPlayers;
+        setPlayers(nextPlayers);
+
+        const registeredPlayers = Array.from(nextPlayers.values()).filter(
+          (registeredPlayer) => registeredPlayer.slot
+        );
+        const finishedPlayers =
+          registeredPlayers.length > 0 &&
+          registeredPlayers.every(
+            (registeredPlayer) => registeredPlayer.totalThrows >= 3
+          )
+            ? registeredPlayers
+            : null;
+
         window.setTimeout(() => {
           window.dispatchEvent(
             new CustomEvent("CLEAR_PLAYER_DARTS", { detail: { key } })
@@ -370,6 +379,14 @@ export function useDisplaySocket({
         ) {
           gameFinishedEmittedRef.current = true;
           emitFinishGame(data.room, finishedPlayers);
+          window.dispatchEvent(
+            new CustomEvent("GAME_FINISHED", {
+              detail: {
+                room: data.room,
+                ranking: buildRanking(finishedPlayers),
+              },
+            })
+          );
         }
       }
     };
