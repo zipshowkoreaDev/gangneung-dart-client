@@ -291,6 +291,7 @@ export function useDisplaySocket({
             isWaiting: true,
             totalThrows: 0,
             currentThrows: 0,
+            throwScores: [],
           });
         });
 
@@ -341,6 +342,7 @@ export function useDisplaySocket({
         const newCurrentThrows = player.currentThrows + 1;
         const isLastThrow = newCurrentThrows >= 3;
         const newScore = player.score + score;
+        const throwScores = [...(player.throwScores ?? []), score].slice(0, 3);
 
         // React 상태 반영 전 onAimOff가 먼저 실행되는 경쟁 조건 방지
         playerLastScoresRef.current.set(key, { name: player.name, score: newScore });
@@ -350,6 +352,7 @@ export function useDisplaySocket({
           score: newScore,
           totalThrows: player.totalThrows + 1,
           currentThrows: isLastThrow ? 0 : newCurrentThrows,
+          throwScores,
         });
         playersRef.current = nextPlayers;
         setPlayers(nextPlayers);
@@ -415,6 +418,7 @@ export function useDisplaySocket({
                 score: 0,
                 totalThrows: 0,
                 currentThrows: 0,
+                throwScores: [],
                 isWaiting: false,
               });
               playersRef.current = next;
@@ -451,6 +455,7 @@ export function useDisplaySocket({
               isWaiting: false,
               totalThrows: 0,
               currentThrows: 0,
+              throwScores: [],
             });
             addedPlayer = true;
             playersRef.current = next;

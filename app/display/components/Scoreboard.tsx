@@ -15,6 +15,24 @@ export default function Scoreboard({
 
   if (playerList.length === 0) return null;
 
+  const renderThrowScores = (player: PlayerScore) => {
+    const scores = Array.from({ length: 3 }, (_, index) => ({
+      label: index === 0 ? "1st" : index === 1 ? "2nd" : "3rd",
+      score: player.throwScores?.[index],
+    }));
+
+    return (
+      <div className="flex items-center justify-center gap-3 text-[0.8rem] font-semibold leading-none text-white/85">
+        {scores.map((item) => (
+          <div key={item.label} className="flex items-baseline gap-1">
+            <span className="text-white/55">{item.label}</span>
+            <span>{item.score ?? "-"}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const renderPlayerCard = (player: PlayerScore) => {
     const hasPlayed = player.totalThrows >= 3;
     const hasScore = !player.isWaiting && player.totalThrows > 0;
@@ -42,6 +60,7 @@ export default function Scoreboard({
             {player.name}
           </span>
         </div>
+        {renderThrowScores(player)}
         <div className="text-[2rem] font-bold text-[#FFD700]">
           {hasScore ? `${player.score} 점` : ""}
         </div>

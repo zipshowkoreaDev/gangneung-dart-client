@@ -9,6 +9,7 @@ const createPlayer = (name = "홍길동") => ({
   isReady: true,
   totalThrows: 0,
   currentThrows: 0,
+  throwScores: [],
 });
 
 describe("hooks/useDisplayState", () => {

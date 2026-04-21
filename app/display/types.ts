@@ -11,4 +11,5 @@ export type PlayerScore = {
   isWaiting?: boolean;
   totalThrows: number;
   currentThrows: number;
+  throwScores: number[];
 };
