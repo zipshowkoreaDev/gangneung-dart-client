@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useState } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { socket } from "@/shared/socket";
 import { getAllPlayerRooms, getPlayerRoom, type PlayerSlot } from "@/lib/room";
 import { debugLog } from "@/app/mobile/components/DebugOverlay";
@@ -8,52 +8,23 @@ interface UseMobileSocketProps {
   name: string;
   enabled: boolean;
   slot: PlayerSlot | null;
-  onGameResult?: (data: GameResultPayload) => void;
   onPlayerFinished?: (playerId: string) => void;
 }
-
-type GameResultPayload = {
-  results: {
-    [socketId: string]: {
-      result: "win" | "lose" | "tie";
-      score: number;
-      rank: number;
-      totalPlayers: number;
-      ranking: Array<{
-        name: string;
-        score: number;
-        rank: number;
-      }>;
-    };
-  };
-  ranking: Array<{
-    socketId: string;
-    name: string;
-    score: number;
-    rank: number;
-  }>;
-};
 
 export function useMobileSocket({
   room,
   name,
   enabled,
   slot,
-  onGameResult,
   onPlayerFinished,
 }: UseMobileSocketProps) {
-  const [isConnected, setIsConnected] = useState(false);
   const throwCountRef = useRef(0);
   const hasJoinedRef = useRef(false);
   const currentRoomRef = useRef<string>("");
   const joinedRoomsRef = useRef<Set<string>>(new Set());
   const slotRef = useRef<PlayerSlot | null>(null);
 
-  const onGameResultRef = useRef(onGameResult);
   const onPlayerFinishedRef = useRef(onPlayerFinished);
-  useEffect(() => {
-    onGameResultRef.current = onGameResult;
-  }, [onGameResult]);
   useEffect(() => {
     onPlayerFinishedRef.current = onPlayerFinished;
   }, [onPlayerFinished]);
@@ -99,13 +70,7 @@ export function useMobileSocket({
 
     const handleConnect = () => {
       debugLog("[Socket] connected");
-      setIsConnected(true);
       joinPlayerRoom();
-    };
-
-    const handleGameResult = (data: GameResultPayload) => {
-      debugLog("[Socket] game-result received");
-      onGameResultRef.current?.(data);
     };
 
     const handleAimOff = (data: {
@@ -121,7 +86,6 @@ export function useMobileSocket({
 
     const handleDisconnect = () => {
       debugLog("[Socket] disconnected");
-      setIsConnected(false);
       hasJoinedRef.current = false;
       currentRoomRef.current = "";
       throwCountRef.current = 0;
@@ -129,7 +93,6 @@ export function useMobileSocket({
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
-    socket.on("game-result", handleGameResult);
     socket.on("aim-off", handleAimOff);
 
     if (socket.connected && !hasJoinedRef.current) {
@@ -139,7 +102,6 @@ export function useMobileSocket({
     return () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
-      socket.off("game-result", handleGameResult);
       socket.off("aim-off", handleAimOff);
     };
   }, [room, name, enabled, slot]);
@@ -231,6 +193,5 @@ export function useMobileSocket({
     emitAimOff,
     leaveGame,
     socketId: socket.id,
-    isConnected,
   };
 }

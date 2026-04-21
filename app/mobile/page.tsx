@@ -40,9 +40,6 @@ export default function MobilePage() {
   const [finishedPlayers, setFinishedPlayers] = useState<Set<string>>(
     () => new Set()
   );
-  const [winner, setWinner] = useState<{ name: string; score: number } | null>(
-    null
-  );
   const [endCountdown, setEndCountdown] = useState<number | null>(null);
 
   const handlePlayerFinished = useCallback((playerId: string) => {
@@ -53,17 +50,6 @@ export default function MobilePage() {
       return next;
     });
   }, []);
-
-  const handleGameResult = useCallback(
-    (data: {
-      ranking?: Array<{ name: string; score: number; rank?: number }>;
-    }) => {
-      const topPlayer = data.ranking?.[0];
-      if (!topPlayer) return;
-      setWinner({ name: topPlayer.name, score: topPlayer.score });
-    },
-    []
-  );
 
   const {
     emitAimUpdate,
@@ -77,7 +63,6 @@ export default function MobilePage() {
     enabled: hasJoined,
     slot: assignedSlot,
     onPlayerFinished: handlePlayerFinished,
-    onGameResult: handleGameResult,
   });
 
   const {
@@ -182,7 +167,6 @@ export default function MobilePage() {
         handleExit();
         setGamePlayers([]);
         setFinishedPlayers(new Set());
-        setWinner(null);
         setEndCountdown(null);
       }, 0);
       return () => window.clearTimeout(timer);
@@ -237,11 +221,9 @@ export default function MobilePage() {
       )}
 
       {sessionValid === true && hasFinishedTurn && !gameFinished && (
-        <ResultScreen
-          name={customName}
-          score={myScore}
-          onExit={handleExit}
-          isWaiting
+        <QueueLoading
+          title="다른 플레이어 진행 중"
+          message="모든 플레이어가 끝날 때까지 기다려주세요."
         />
       )}
 
@@ -251,8 +233,6 @@ export default function MobilePage() {
           score={myScore}
           onExit={handleExit}
           countdown={endCountdown}
-          winnerName={winner?.name}
-          winnerScore={winner?.score}
         />
       )}
 
