@@ -40,7 +40,7 @@ interface UseDisplaySocketProps {
   setPlayers: Dispatch<SetStateAction<Map<string, PlayerScore>>>;
   setPlayerOrder: Dispatch<SetStateAction<string[]>>;
   players: Map<string, PlayerScore>;
-  onPlayerFinish?: (name: string, score: number) => void;
+  onPlayersFinish?: (players: Array<{ name: string; score: number }>) => void;
 }
 
 function getCurrentRouletteRadius(): number {
@@ -85,10 +85,10 @@ export function useDisplaySocket({
   setPlayers,
   setPlayerOrder,
   players,
-  onPlayerFinish,
+  onPlayersFinish,
 }: UseDisplaySocketProps) {
   const playersRef = useRef(players);
-  const onPlayerFinishRef = useRef(onPlayerFinish);
+  const onPlayersFinishRef = useRef(onPlayersFinish);
   const gameFinishedEmittedRef = useRef(false);
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
 
@@ -100,8 +100,8 @@ export function useDisplaySocket({
   }, [players]);
 
   useEffect(() => {
-    onPlayerFinishRef.current = onPlayerFinish;
-  }, [onPlayerFinish]);
+    onPlayersFinishRef.current = onPlayersFinish;
+  }, [onPlayersFinish]);
 
   const emitFinishGame = useCallback(
     (targetRoom: string, finishedPlayers: PlayerScore[]) => {
@@ -382,11 +382,13 @@ export function useDisplaySocket({
           !gameFinishedEmittedRef.current
         ) {
           const ranking = buildRanking(finishedPlayers);
-          const winner = ranking[0];
           gameFinishedEmittedRef.current = true;
-          if (winner) {
-            onPlayerFinishRef.current?.(winner.name, winner.score);
-          }
+          onPlayersFinishRef.current?.(
+            finishedPlayers.map((player) => ({
+              name: player.name,
+              score: player.score,
+            }))
+          );
           emitFinishGame(data.room, finishedPlayers);
           window.dispatchEvent(
             new CustomEvent("GAME_FINISHED", {

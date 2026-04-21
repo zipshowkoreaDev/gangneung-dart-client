@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   getRankings,
-  addRanking,
+  addRankings,
   getMillisecondsUntilRankingReset,
   RankingEntry,
 } from "@/lib/ranking";
@@ -9,10 +9,12 @@ import {
 export default function useRankings() {
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
 
-  const handlePlayerFinish = useCallback((name: string, score: number) => {
-    const updated = addRanking(name, score);
-    setRankings(updated);
-  }, []);
+  const handlePlayersFinish = useCallback(
+    (players: Array<{ name: string; score: number }>) => {
+      setRankings(addRankings(players));
+    },
+    []
+  );
 
   useEffect(() => {
     const loadTimerId = window.setTimeout(() => {
@@ -39,6 +41,6 @@ export default function useRankings() {
 
   return {
     rankings,
-    handlePlayerFinish,
+    handlePlayersFinish,
   };
 }

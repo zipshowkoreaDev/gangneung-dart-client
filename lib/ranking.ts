@@ -7,6 +7,8 @@ export interface RankingEntry {
   timestamp: number;
 }
 
+export type RankingInput = Pick<RankingEntry, "name" | "score">;
+
 interface RankingData {
   dateKey?: string;
   expiresAt: number;
@@ -68,28 +70,13 @@ export function getRankings(): RankingEntry[] {
   }
 }
 
-export function addRanking(name: string, score: number): RankingEntry[] {
-  if (typeof window === "undefined") return [];
-
-  const current = getRankings();
-  const newEntry: RankingEntry = {
-    name,
-    score,
-    timestamp: Date.now(),
-  };
-
-  // 기존 랭킹에 새 기록 추가
-  const updated = [...current, newEntry];
-
-  // 정렬: 점수 내림차순, 동점 시 최신 기록 우선
-  updated.sort((a, b) => {
+function saveRankings(rankings: RankingEntry[]): RankingEntry[] {
+  rankings.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     return b.timestamp - a.timestamp;
   });
 
-  // 상위 랭킹 제한 수만 유지
-  const topRankings = updated.slice(0, RANKING_LIMIT);
-
+  const topRankings = rankings.slice(0, RANKING_LIMIT);
   const data: RankingData = {
     dateKey: getLocalDateKey(),
     expiresAt: getNextLocalMidnight(),
@@ -103,6 +90,23 @@ export function addRanking(name: string, score: number): RankingEntry[] {
   }
 
   return topRankings;
+}
+
+export function addRanking(name: string, score: number): RankingEntry[] {
+  return addRankings([{ name, score }]);
+}
+
+export function addRankings(entries: RankingInput[]): RankingEntry[] {
+  if (typeof window === "undefined") return [];
+
+  const current = getRankings();
+  const timestamp = Date.now();
+  const newEntries = entries.map((entry, index) => ({
+    ...entry,
+    timestamp: timestamp + index,
+  }));
+
+  return saveRankings([...current, ...newEntries]);
 }
 
 export function clearRankings(): void {

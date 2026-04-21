@@ -34,12 +34,12 @@ describe("hooks/useRankings", () => {
     });
   });
 
-  describe("handlePlayerFinish", () => {
+  describe("handlePlayersFinish", () => {
     it("플레이어 점수 추가", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
-        result.current.handlePlayerFinish("홍길동", 100);
+        result.current.handlePlayersFinish([{ name: "홍길동", score: 100 }]);
       });
 
       expect(result.current.rankings).toHaveLength(1);
@@ -51,13 +51,11 @@ describe("hooks/useRankings", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
-        result.current.handlePlayerFinish("홍길동", 50);
-      });
-      act(() => {
-        result.current.handlePlayerFinish("김철수", 100);
-      });
-      act(() => {
-        result.current.handlePlayerFinish("이영희", 75);
+        result.current.handlePlayersFinish([
+          { name: "홍길동", score: 50 },
+          { name: "김철수", score: 100 },
+          { name: "이영희", score: 75 },
+        ]);
       });
 
       expect(result.current.rankings).toHaveLength(3);
@@ -69,31 +67,28 @@ describe("hooks/useRankings", () => {
       expect(result.current.rankings[2].score).toBe(50);
     });
 
-    it("Top 5만 유지", () => {
+    it("Top 10만 유지", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
-        result.current.handlePlayerFinish("P1", 10);
-      });
-      act(() => {
-        result.current.handlePlayerFinish("P2", 20);
-      });
-      act(() => {
-        result.current.handlePlayerFinish("P3", 30);
-      });
-      act(() => {
-        result.current.handlePlayerFinish("P4", 40);
-      });
-      act(() => {
-        result.current.handlePlayerFinish("P5", 50);
-      });
-      act(() => {
-        result.current.handlePlayerFinish("P6", 60);
+        result.current.handlePlayersFinish([
+          { name: "P1", score: 10 },
+          { name: "P2", score: 20 },
+          { name: "P3", score: 30 },
+          { name: "P4", score: 40 },
+          { name: "P5", score: 50 },
+          { name: "P6", score: 60 },
+          { name: "P7", score: 70 },
+          { name: "P8", score: 80 },
+          { name: "P9", score: 90 },
+          { name: "P10", score: 100 },
+          { name: "P11", score: 110 },
+        ]);
       });
 
-      expect(result.current.rankings).toHaveLength(5);
-      expect(result.current.rankings[0].name).toBe("P6");
-      expect(result.current.rankings[0].score).toBe(60);
+      expect(result.current.rankings).toHaveLength(10);
+      expect(result.current.rankings[0].name).toBe("P11");
+      expect(result.current.rankings[0].score).toBe(110);
       // P1 (10점)은 제외됨
       expect(result.current.rankings.find((r) => r.name === "P1")).toBeUndefined();
     });
@@ -102,7 +97,7 @@ describe("hooks/useRankings", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
-        result.current.handlePlayerFinish("실패자", 0);
+        result.current.handlePlayersFinish([{ name: "실패자", score: 0 }]);
       });
 
       expect(result.current.rankings).toHaveLength(1);
@@ -113,10 +108,10 @@ describe("hooks/useRankings", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
-        result.current.handlePlayerFinish("홍길동", 50);
-      });
-      act(() => {
-        result.current.handlePlayerFinish("홍길동", 100);
+        result.current.handlePlayersFinish([
+          { name: "홍길동", score: 50 },
+          { name: "홍길동", score: 100 },
+        ]);
       });
 
       expect(result.current.rankings).toHaveLength(2);
@@ -126,11 +121,11 @@ describe("hooks/useRankings", () => {
   });
 
   describe("localStorage 연동", () => {
-    it("handlePlayerFinish 후 localStorage에 저장", async () => {
+    it("handlePlayersFinish 후 localStorage에 저장", async () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
-        result.current.handlePlayerFinish("홍길동", 100);
+        result.current.handlePlayersFinish([{ name: "홍길동", score: 100 }]);
       });
 
       // 새 Hook 인스턴스에서 데이터 확인
@@ -149,7 +144,7 @@ describe("hooks/useRankings", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
-        result.current.handlePlayerFinish("홍길동", 100);
+        result.current.handlePlayersFinish([{ name: "홍길동", score: 100 }]);
       });
 
       expect(result.current.rankings).toHaveLength(1);

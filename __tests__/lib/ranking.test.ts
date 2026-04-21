@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   getRankings,
   addRanking,
+  addRankings,
   clearRankings,
   getMillisecondsUntilRankingReset,
 } from "@/lib/ranking";
@@ -52,17 +53,25 @@ describe("lib/ranking", () => {
       expect(result[0].score).toBe(100);
     });
 
-    it("R-2-2: Top 5만 유지", () => {
-      addRanking("Player1", 10);
-      addRanking("Player2", 20);
-      addRanking("Player3", 30);
-      addRanking("Player4", 40);
-      addRanking("Player5", 50);
-      const result = addRanking("Player6", 60);
+    it("R-2-2: Top 10만 유지", () => {
+      const result = addRankings([
+        { name: "Player1", score: 10 },
+        { name: "Player2", score: 20 },
+        { name: "Player3", score: 30 },
+        { name: "Player4", score: 40 },
+        { name: "Player5", score: 50 },
+        { name: "Player6", score: 60 },
+        { name: "Player7", score: 70 },
+        { name: "Player8", score: 80 },
+        { name: "Player9", score: 90 },
+        { name: "Player10", score: 100 },
+        { name: "Player11", score: 110 },
+      ]);
 
-      expect(result).toHaveLength(5);
-      expect(result[0].score).toBe(60);
-      expect(result[4].score).toBe(20);
+      expect(result).toHaveLength(10);
+      expect(result[0].score).toBe(110);
+      expect(result[9].score).toBe(20);
+      expect(result.find((entry) => entry.name === "Player1")).toBeUndefined();
     });
 
     it("R-2-3: 점수 내림차순 정렬", () => {

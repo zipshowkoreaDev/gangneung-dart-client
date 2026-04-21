@@ -30,7 +30,7 @@ export default function DisplayPage() {
     playerOrder,
     setPlayerOrder,
   } = useDisplayState();
-  const { rankings, handlePlayerFinish } = useRankings();
+  const { rankings, handlePlayersFinish } = useRankings();
 
   const mobileUrl = useDisplayQrUrl();
 
@@ -42,7 +42,7 @@ export default function DisplayPage() {
     setPlayers,
     setPlayerOrder,
     players,
-    onPlayerFinish: handlePlayerFinish,
+    onPlayersFinish: handlePlayersFinish,
   });
 
   useEffect(() => {
