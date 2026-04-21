@@ -17,7 +17,7 @@ type UseQueueSessionFlowReturn = {
   isInQueue: boolean;
   queuePosition: number | null;
   queueSnapshot: string[] | null;
-  approvalRemainingSeconds: number | null;
+  isWaitingForApproval: boolean;
   joinedQueueRef: React.MutableRefObject<boolean>;
   connectAndJoinQueue: () => void;
   leaveQueue: () => void;
@@ -47,7 +47,7 @@ export default function useQueueSessionFlow({
     isInQueue,
     queuePosition,
     queueSnapshot,
-    approvalRemainingSeconds,
+    isWaitingForApproval,
     joinedQueueRef,
     leaveQueue,
     connectAndJoinQueue,
@@ -62,7 +62,7 @@ export default function useQueueSessionFlow({
     isInQueue,
     queuePosition,
     queueSnapshot,
-    approvalRemainingSeconds,
+    isWaitingForApproval,
     joinedQueueRef,
     connectAndJoinQueue,
     leaveQueue,

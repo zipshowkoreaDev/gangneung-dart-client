@@ -88,7 +88,7 @@ export default function MobilePage() {
     isInQueue,
     queuePosition,
     queueSnapshot,
-    approvalRemainingSeconds,
+    isWaitingForApproval: hasApprovalWait,
     joinedQueueRef,
     connectAndJoinQueue,
     leaveQueue,
@@ -194,7 +194,7 @@ export default function MobilePage() {
     queuePosition !== null &&
     queuePosition >= 0 &&
     queuePosition < MAX_PLAYERS &&
-    approvalRemainingSeconds !== null;
+    hasApprovalWait;
   return (
     <div className="h-screen flex flex-col items-center justify-center gap-8 bg-gradient-to-br from-[#1e3c72] to-[#2a5298] px-5">
       <DebugOverlay />
@@ -216,7 +216,6 @@ export default function MobilePage() {
         <QueueLoading
           title="플레이어 참여 대기 중"
           message={`${MAX_PLAYERS}명이 모이면 바로 시작합니다. 모이지 않으면 30초 후 자동 시작됩니다.`}
-          remainingSeconds={approvalRemainingSeconds}
         />
       )}
 

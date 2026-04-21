@@ -19,7 +19,7 @@ interface UseQueueReturn {
   isInQueue: boolean;
   queuePosition: number | null;
   queueSnapshot: string[] | null;
-  approvalRemainingSeconds: number | null;
+  isWaitingForApproval: boolean;
   joinedQueueRef: React.MutableRefObject<boolean>;
   leaveQueue: () => void;
   connectAndJoinQueue: () => void;
@@ -35,15 +35,12 @@ export function useQueue({
   const [isInQueue, setIsInQueue] = useState(false);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [queueSnapshot, setQueueSnapshot] = useState<string[] | null>(null);
-  const [approvalRemainingSeconds, setApprovalRemainingSeconds] = useState<
-    number | null
-  >(null);
+  const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
   const joinedQueueRef = useRef(false);
   const lastRejoinAtRef = useRef(0);
   const queueStartAtRef = useRef<number | null>(null);
   const approvalStartAtRef = useRef<number | null>(null);
   const approvalTimeoutRef = useRef<number | null>(null);
-  const approvalIntervalRef = useRef<number | null>(null);
   const pendingSlotRef = useRef<PlayerSlot | null>(null);
   const pendingPlayersRef = useRef<string[]>([]);
   const lastJoinedSocketIdRef = useRef<string | null>(null);
@@ -53,14 +50,10 @@ export function useQueue({
       window.clearTimeout(approvalTimeoutRef.current);
       approvalTimeoutRef.current = null;
     }
-    if (approvalIntervalRef.current !== null) {
-      window.clearInterval(approvalIntervalRef.current);
-      approvalIntervalRef.current = null;
-    }
     approvalStartAtRef.current = null;
     pendingSlotRef.current = null;
     pendingPlayersRef.current = [];
-    setApprovalRemainingSeconds(null);
+    setIsWaitingForApproval(false);
   }, []);
 
   const leaveQueue = useCallback(() => {
@@ -117,13 +110,6 @@ export function useQueue({
       onEnterGame(slot, players);
     };
 
-    const updateApprovalCountdown = () => {
-      if (!approvalStartAtRef.current) return;
-      const elapsed = Date.now() - approvalStartAtRef.current;
-      const remaining = Math.max(0, AUTO_APPROVAL_DELAY_MS - elapsed);
-      setApprovalRemainingSeconds(Math.ceil(remaining / 1000));
-    };
-
     const waitForAutoApproval = (slot: PlayerSlot, players: string[]) => {
       pendingSlotRef.current = slot;
       pendingPlayersRef.current = players;
@@ -133,14 +119,7 @@ export function useQueue({
         debugLog("[Queue] 자동 승인 대기 시작");
       }
 
-      updateApprovalCountdown();
-
-      if (approvalIntervalRef.current === null) {
-        approvalIntervalRef.current = window.setInterval(
-          updateApprovalCountdown,
-          250
-        );
-      }
+      setIsWaitingForApproval(true);
 
       if (approvalTimeoutRef.current === null) {
         const elapsed = Date.now() - approvalStartAtRef.current;
@@ -257,7 +236,7 @@ export function useQueue({
     isInQueue,
     queuePosition,
     queueSnapshot,
-    approvalRemainingSeconds,
+    isWaitingForApproval,
     joinedQueueRef,
     leaveQueue,
     connectAndJoinQueue,

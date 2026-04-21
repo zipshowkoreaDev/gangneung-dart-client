@@ -339,7 +339,6 @@ export function useDisplaySocket({
         // 동기적으로 누적한 playerScoresRef 값을 우선 사용
         const tracked = playerScoresRef.current.get(key);
         const basePlayer = playersRef.current.get(key);
-        const finishedName = tracked?.name ?? basePlayer?.name;
         const finishedScore = tracked?.score ?? basePlayer?.score ?? 0;
         playerScoresRef.current.delete(key);
         finishedPlayerKeysRef.current.add(key);
@@ -377,21 +376,23 @@ export function useDisplaySocket({
           );
         }, CLEAR_DARTS_DELAY_MS);
 
-        if (basePlayer && finishedName) {
-          onPlayerFinishRef.current?.(finishedName, finishedScore);
-        }
         if (
           data.room &&
           finishedPlayers &&
           !gameFinishedEmittedRef.current
         ) {
+          const ranking = buildRanking(finishedPlayers);
+          const winner = ranking[0];
           gameFinishedEmittedRef.current = true;
+          if (winner) {
+            onPlayerFinishRef.current?.(winner.name, winner.score);
+          }
           emitFinishGame(data.room, finishedPlayers);
           window.dispatchEvent(
             new CustomEvent("GAME_FINISHED", {
               detail: {
                 room: data.room,
-                ranking: buildRanking(finishedPlayers),
+                ranking,
               },
             })
           );
