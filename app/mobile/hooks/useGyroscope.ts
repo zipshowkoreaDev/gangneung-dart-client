@@ -1,4 +1,10 @@
 import { useState, useRef, useCallback } from "react";
+import {
+  DEFAULT_ROULETTE_RADIUS,
+  getScoreFromZone,
+  getZoneFromAim,
+  type Zone,
+} from "@/lib/score";
 
 const AIM_HZ = 30;
 const AIM_INTERVAL = 1000 / AIM_HZ;
@@ -16,31 +22,6 @@ const RELEASE_THRESHOLD_WITH_GRAVITY = 15;
 const THRESHOLD_WITHOUT_GRAVITY = 18;
 const RELEASE_THRESHOLD_WITHOUT_GRAVITY = 8;
 
-const CAMERA_Z = 50;
-const PLANE_Z = 1;
-const FOV = 50;
-const CAMERA_DISTANCE = CAMERA_Z - PLANE_Z;
-const HALF_FOV_RAD = (FOV / 2) * (Math.PI / 180);
-const AIM_TO_3D_SCALE = CAMERA_DISTANCE * Math.tan(HALF_FOV_RAD);
-
-const DEFAULT_ROULETTE_RADIUS = 8.105359363722414;
-
-const ZONE_RATIOS = {
-  BULL: 0.08,
-  INNER_SINGLE: 0.47,
-  TRIPLE: 0.54,
-  OUTER_SINGLE: 0.93,
-  DOUBLE: 1.0,
-};
-
-const SCORES = {
-  BULL: 50,
-  SINGLE: 10,
-  TRIPLE: 30,
-  DOUBLE: 20,
-  MISS: 0,
-};
-
 export type HitZone = "bull" | "single" | "triple" | "double" | "miss";
 
 interface HitResult {
@@ -53,7 +34,6 @@ interface UseGyroscopeProps {
   emitAimOff: () => void;
   emitThrowDart: (payload: {
     aim: { x: number; y: number };
-    score: number;
     zone: HitZone;
   }) => void;
   rouletteRadius?: number;
@@ -63,23 +43,19 @@ function clamp(v: number): number {
   return Math.max(-1, Math.min(1, v));
 }
 
+function toHitZone(zone: Zone): HitZone {
+  return zone.toLowerCase() as HitZone;
+}
+
 function getHitResult(
   aim: { x: number; y: number },
   rouletteRadius: number
 ): HitResult {
-  const pos3D = {
-    x: aim.x * AIM_TO_3D_SCALE,
-    y: aim.y * AIM_TO_3D_SCALE,
+  const zone = getZoneFromAim(aim, rouletteRadius);
+  return {
+    zone: toHitZone(zone),
+    score: getScoreFromZone(zone),
   };
-  const distance = Math.hypot(pos3D.x, pos3D.y);
-  const ratio = distance / rouletteRadius;
-
-  if (ratio <= ZONE_RATIOS.BULL) return { zone: "bull", score: SCORES.BULL };
-  if (ratio <= ZONE_RATIOS.INNER_SINGLE) return { zone: "single", score: SCORES.SINGLE };
-  if (ratio <= ZONE_RATIOS.TRIPLE) return { zone: "triple", score: SCORES.TRIPLE };
-  if (ratio <= ZONE_RATIOS.OUTER_SINGLE) return { zone: "single", score: SCORES.SINGLE };
-  if (ratio <= ZONE_RATIOS.DOUBLE) return { zone: "double", score: SCORES.DOUBLE };
-  return { zone: "miss", score: SCORES.MISS };
 }
 
 export function useGyroscope({
@@ -252,7 +228,6 @@ export function useGyroscope({
 
           emitThrowDart({
             aim: aimRef.current,
-            score: hitResult.score,
             zone: hitResult.zone,
           });
 

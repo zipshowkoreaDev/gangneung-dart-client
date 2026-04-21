@@ -137,6 +137,32 @@ describe("hooks/useRankings", () => {
         result.current.rankings.filter((entry) => entry.name === "홍길동")
       ).toHaveLength(1);
     });
+
+    it("새 게임 결과는 이전 TOP 10을 교체", () => {
+      addRanking("이전게임", 999);
+      const { result } = renderHook(() => useRankings());
+
+      act(() => {
+        result.current.handlePlayersFinish(
+          [
+            { name: "플레이어1", score: 10 },
+            { name: "플레이어2", score: 30 },
+            { name: "플레이어3", score: 70 },
+          ],
+          "game-latest"
+        );
+      });
+
+      expect(result.current.rankings).toHaveLength(3);
+      expect(result.current.rankings.map((entry) => entry.name)).toEqual([
+        "플레이어3",
+        "플레이어2",
+        "플레이어1",
+      ]);
+      expect(
+        result.current.rankings.find((entry) => entry.name === "이전게임")
+      ).toBeUndefined();
+    });
   });
 
   describe("localStorage 연동", () => {

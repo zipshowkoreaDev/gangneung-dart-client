@@ -109,6 +109,18 @@ export function addRankings(entries: RankingInput[]): RankingEntry[] {
   return saveRankings([...current, ...newEntries]);
 }
 
+export function replaceRankings(entries: RankingInput[]): RankingEntry[] {
+  if (typeof window === "undefined") return [];
+
+  const timestamp = Date.now();
+  const newEntries = entries.map((entry, index) => ({
+    ...entry,
+    timestamp: timestamp + index,
+  }));
+
+  return saveRankings(newEntries);
+}
+
 export function clearRankings(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(STORAGE_KEY);

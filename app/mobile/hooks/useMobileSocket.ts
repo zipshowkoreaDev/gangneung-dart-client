@@ -19,7 +19,6 @@ export function useMobileSocket({
   onPlayerFinished,
 }: UseMobileSocketProps) {
   const throwCountRef = useRef(0);
-  const finalScoreRef = useRef(0);
   const hasJoinedRef = useRef(false);
   const currentRoomRef = useRef<string>("");
   const joinedRoomsRef = useRef<Set<string>>(new Set());
@@ -35,7 +34,6 @@ export function useMobileSocket({
     slotRef.current = slot;
     if (enabled && slot) {
       throwCountRef.current = 0;
-      finalScoreRef.current = 0;
     }
   }, [slot, enabled]);
 
@@ -82,7 +80,6 @@ export function useMobileSocket({
       socketId?: string;
       playerId?: string;
       name?: string;
-      finalScore?: number;
       totalThrows?: number;
     }) => {
       if ((data.totalThrows ?? 0) < 3) {
@@ -100,7 +97,6 @@ export function useMobileSocket({
       hasJoinedRef.current = false;
       currentRoomRef.current = "";
       throwCountRef.current = 0;
-      finalScoreRef.current = 0;
     };
 
     socket.on("connect", handleConnect);
@@ -152,7 +148,7 @@ export function useMobileSocket({
   );
 
   const emitThrowDart = useCallback(
-    (payload: { aim: { x: number; y: number }; score: number; zone?: string }) => {
+    (payload: { aim: { x: number; y: number }; zone?: string }) => {
       if (!socket.connected || !slotRef.current) return;
       if (throwCountRef.current >= 3) return;
       const playerRoom = getPlayerRoom(room, slotRef.current);
@@ -161,19 +157,16 @@ export function useMobileSocket({
         socketId: socket.id,
         name,
         aim: payload.aim,
-        score: payload.score,
         zone: payload.zone,
       });
 
       throwCountRef.current += 1;
-      finalScoreRef.current += payload.score;
 
       if (throwCountRef.current >= 3) {
         socket.emit("aim-off", {
           room: playerRoom,
           socketId: socket.id,
           name,
-          finalScore: finalScoreRef.current,
           totalThrows: throwCountRef.current,
         });
         throwCountRef.current = 3;
@@ -191,7 +184,6 @@ export function useMobileSocket({
       name,
       ...(throwCountRef.current >= 3
         ? {
-            finalScore: finalScoreRef.current,
             totalThrows: throwCountRef.current,
           }
         : {}),
@@ -211,7 +203,6 @@ export function useMobileSocket({
     }
 
     throwCountRef.current = 0;
-    finalScoreRef.current = 0;
     hasJoinedRef.current = false;
     currentRoomRef.current = "";
     joinedRoomsRef.current.clear();

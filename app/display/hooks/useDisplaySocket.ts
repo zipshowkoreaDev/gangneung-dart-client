@@ -296,7 +296,7 @@ export function useDisplaySocket({
       socketId?: string;
       skin?: string;
       aim: { x: number; y: number };
-      score: number;
+      score?: number;
     }) => {
       if (!isPlayerRoomEvent(data.room)) return;
 
@@ -311,10 +311,9 @@ export function useDisplaySocket({
         return;
       }
 
-      const fallbackScore = isAimInsideDisplayBounds(data.aim)
+      const score = isAimInsideDisplayBounds(data.aim)
         ? getHitScoreFromAim(data.aim)
         : 0;
-      const score = Number.isFinite(data.score) ? data.score : fallbackScore;
       const hitSound = new Audio("/sound/hit.mp3");
       hitSound.play().catch((e) => {
         onLog?.(`Sound play failed: ${String(e)}`);
@@ -474,7 +473,6 @@ export function useDisplaySocket({
       playerId?: string;
       name?: string;
       socketId?: string;
-      finalScore?: number;
       totalThrows?: number;
     }) => {
       if (!isPlayerRoomEvent(data.room)) return;
@@ -497,10 +495,7 @@ export function useDisplaySocket({
         const basePlayer = playersRef.current.get(key);
         const reportedThrows = data.totalThrows ?? basePlayer?.totalThrows ?? 0;
         const hasFinishedTurn = reportedThrows >= 3;
-        const reportedScore = Number.isFinite(data.finalScore)
-          ? data.finalScore
-          : undefined;
-        const finishedScore = reportedScore ?? tracked?.score ?? basePlayer?.score ?? 0;
+        const finishedScore = tracked?.score ?? basePlayer?.score ?? 0;
         playerLastScoresRef.current.delete(key);
         const nextPlayers = new Map(playersRef.current);
         const player = nextPlayers.get(key);
