@@ -2,7 +2,12 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { socket } from "@/shared/socket";
-import { getSlotFromPosition, MAX_PLAYERS, type PlayerSlot } from "@/lib/room";
+import {
+  getAllPlayerRooms,
+  getSlotFromPosition,
+  MAX_PLAYERS,
+  type PlayerSlot,
+} from "@/lib/room";
 import { debugLog } from "@/app/mobile/debugLog";
 
 const QUEUE_TIMEOUT_MS = 2 * 60 * 1000;
@@ -47,6 +52,7 @@ export function useQueue({
   const queueStartAtRef = useRef<number | null>(null);
   const lastJoinedSocketIdRef = useRef<string | null>(null);
   const startRequestedRef = useRef(false);
+  const queueSnapshotRef = useRef<string[]>([]);
 
   const clearApprovalWait = useCallback(() => {
     setIsWaitingForApproval(false);
@@ -63,6 +69,7 @@ export function useQueue({
     setIsInQueue(false);
     setQueuePosition(null);
     setQueueSnapshot(null);
+    queueSnapshotRef.current = [];
     setIsHost(false);
     setCanStartGame(false);
     queueStartAtRef.current = null;
@@ -109,6 +116,16 @@ export function useQueue({
       onEnterGame(slot, players);
     };
 
+    const enterGameFromQueueSnapshot = () => {
+      const players = queueSnapshotRef.current.slice(0, MAX_PLAYERS);
+      const position = socket.id ? players.indexOf(socket.id) : -1;
+      const slot = getSlotFromPosition(position);
+
+      if (!slot) return;
+
+      enterGame(slot, players);
+    };
+
     const startGameWithPlayers = (players: string[]) => {
       const position = socket.id ? players.indexOf(socket.id) : -1;
       const slot = getSlotFromPosition(position);
@@ -131,6 +148,7 @@ export function useQueue({
       const uniqueQueue = Array.from(new Set(queue));
       debugLog(`[Queue] status-queue: ${JSON.stringify(uniqueQueue)}`);
       setQueueSnapshot(uniqueQueue);
+      queueSnapshotRef.current = uniqueQueue;
 
       const position = findMyPosition(uniqueQueue);
       debugLog(`[Queue] 내 위치: ${position}`);
@@ -184,8 +202,24 @@ export function useQueue({
       enterGame(slot, players);
     };
 
+    const onAimUpdate = (data: { socketId?: string; registration?: boolean }) => {
+      if (!data.registration || !data.socketId || data.socketId === socket.id) {
+        return;
+      }
+
+      const players = queueSnapshotRef.current.slice(0, MAX_PLAYERS);
+      if (!players.includes(data.socketId)) return;
+
+      debugLog(`[Queue] registration start detected: ${data.socketId}`);
+      enterGameFromQueueSnapshot();
+    };
+
     const onConnect = () => {
       debugLog("[Socket] connected (queue mode)");
+      getAllPlayerRooms(room).forEach((playerRoom) => {
+        socket.emit("joinRoom", { room: playerRoom, name });
+      });
+
       if (!joinedQueueRef.current || lastJoinedSocketIdRef.current !== socket.id) {
         debugLog("[Queue] join-queue emit");
         socket.emit("join-queue");
@@ -211,6 +245,7 @@ export function useQueue({
     socket.on("error", onError);
     socket.on("status-queue", onStatusQueue);
     socket.on(GAME_STARTED_EVENT, onGameStarted);
+    socket.on("aim-update", onAimUpdate);
 
     const heartbeatId = window.setInterval(() => {
       if (!socket.connected || !joinedQueueRef.current) return;
@@ -240,6 +275,7 @@ export function useQueue({
       socket.off("error", onError);
       socket.off("status-queue", onStatusQueue);
       socket.off(GAME_STARTED_EVENT, onGameStarted);
+      socket.off("aim-update", onAimUpdate);
     };
   }, [isInQueue, isInGame, name, onEnterGame, room, leaveQueue, clearApprovalWait]);
 
