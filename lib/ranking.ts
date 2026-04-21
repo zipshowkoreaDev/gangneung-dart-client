@@ -1,4 +1,5 @@
 const STORAGE_KEY = "dart-ranking";
+export const RANKING_LIMIT = 10;
 
 export interface RankingEntry {
   name: string;
@@ -86,13 +87,13 @@ export function addRanking(name: string, score: number): RankingEntry[] {
     return b.timestamp - a.timestamp;
   });
 
-  // Top 5만 유지
-  const top5 = updated.slice(0, 5);
+  // 상위 랭킹 제한 수만 유지
+  const topRankings = updated.slice(0, RANKING_LIMIT);
 
   const data: RankingData = {
     dateKey: getLocalDateKey(),
     expiresAt: getNextLocalMidnight(),
-    rankings: top5,
+    rankings: topRankings,
   };
 
   try {
@@ -101,7 +102,7 @@ export function addRanking(name: string, score: number): RankingEntry[] {
     // 저장 실패 시 무시
   }
 
-  return top5;
+  return topRankings;
 }
 
 export function clearRankings(): void {
