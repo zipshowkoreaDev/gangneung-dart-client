@@ -1,7 +1,6 @@
 "use client";
 
-import { getDisplayAimBounds } from "@/lib/displayAimBounds";
-import { DISPLAY_CANVAS_Y_OFFSET } from "@/lib/displayLayout";
+import { aimToDisplayPosition } from "@/lib/displayAimCoordinates";
 
 type AimPosition = {
   x: number;
@@ -26,18 +25,11 @@ export default function AimOverlay({
   playerOrder,
   players,
 }: AimOverlayProps) {
-  const bounds = getDisplayAimBounds();
-
   return (
     <>
       {Array.from(aimPositions.entries())
         .map(([playerKey, pos]) => {
-          // -1..1 → 0..1
-          const x01 = (pos.x + 1) / 2;
-          const y01 = (pos.y + 1) / 2 + DISPLAY_CANVAS_Y_OFFSET;
-          const clampedX01 = Math.min(bounds.right, Math.max(bounds.left, x01));
-          const clampedY01 = Math.min(bounds.bottom, Math.max(bounds.top, y01));
-
+          const { x01, y01 } = aimToDisplayPosition(pos);
           const color = resolveColor(playerKey, playerOrder);
 
           return (
@@ -46,8 +38,8 @@ export default function AimOverlay({
               <div
                 style={{
                   position: "absolute",
-                  left: `${clampedX01 * 100}%`,
-                  top: `${clampedY01 * 100}%`,
+                  left: `${x01 * 100}%`,
+                  top: `${y01 * 100}%`,
                   transform: "translate(-50%, -50%)",
                   width: 40,
                   height: 40,
@@ -63,8 +55,8 @@ export default function AimOverlay({
               <div
                 style={{
                   position: "absolute",
-                  left: `${clampedX01 * 100}%`,
-                  top: `${clampedY01 * 100}%`,
+                  left: `${x01 * 100}%`,
+                  top: `${y01 * 100}%`,
                   transform: "translate(-50%, -50%)",
                   width: 6,
                   height: 6,
@@ -78,8 +70,8 @@ export default function AimOverlay({
               <div
                 style={{
                   position: "absolute",
-                  left: `${clampedX01 * 100}%`,
-                  top: `${clampedY01 * 100}%`,
+                  left: `${x01 * 100}%`,
+                  top: `${y01 * 100}%`,
                   transform: "translate(-50%, calc(-50% - 35px))",
                   background: "rgba(0, 0, 0, 0.7)",
                   color: "white",

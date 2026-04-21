@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
 interface StuckDartProps {
   position: [number, number, number];
@@ -148,7 +149,7 @@ function DartEventHandler({
 
       if (!data.aim) return;
 
-      const { x, y } = data.aim;
+      const { x, y } = aimToCanvasNdc(data.aim);
 
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2(x, y);

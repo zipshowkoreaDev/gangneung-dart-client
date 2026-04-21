@@ -1,4 +1,5 @@
 import { clamp } from "@/lib/score";
+import { DISPLAY_CANVAS_Y_OFFSET } from "@/lib/displayLayout";
 
 export const DISPLAY_AIM_BOUNDS = {
   centerX: 0.5,
@@ -27,7 +28,7 @@ export function isAimInsideDisplayBounds(aim?: { x: number; y: number }): boolea
   const x = clamp(aim.x, -1, 1);
   const y = clamp(aim.y, -1, 1);
   const x01 = (x + 1) / 2;
-  const y01 = (y + 1) / 2;
+  const y01 = (y + 1) / 2 + DISPLAY_CANVAS_Y_OFFSET;
   return (
     x01 >= bounds.left &&
     x01 <= bounds.right &&
