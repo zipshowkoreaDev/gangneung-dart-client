@@ -46,6 +46,7 @@ export function useQueue({
   const lastRejoinAtRef = useRef(0);
   const queueStartAtRef = useRef<number | null>(null);
   const lastJoinedSocketIdRef = useRef<string | null>(null);
+  const startRequestedRef = useRef(false);
 
   const clearApprovalWait = useCallback(() => {
     setIsWaitingForApproval(false);
@@ -65,6 +66,7 @@ export function useQueue({
     setIsHost(false);
     setCanStartGame(false);
     queueStartAtRef.current = null;
+    startRequestedRef.current = false;
     clearApprovalWait();
   }, [clearApprovalWait]);
 
@@ -107,6 +109,24 @@ export function useQueue({
       onEnterGame(slot, players);
     };
 
+    const startGameWithPlayers = (players: string[]) => {
+      const position = socket.id ? players.indexOf(socket.id) : -1;
+      const slot = getSlotFromPosition(position);
+
+      if (!slot || position !== 0) {
+        startRequestedRef.current = false;
+        setCanStartGame(position === 0);
+        return;
+      }
+
+      debugLog(`[Queue] host start-game: ${JSON.stringify(players)}`);
+      socket.emit(START_GAME_EVENT, { room, players });
+      socket.emit(GAME_STARTED_EVENT, { room, players });
+      setCanStartGame(false);
+      startRequestedRef.current = false;
+      onEnterGame(slot, players);
+    };
+
     const onStatusQueue = (queue: string[]) => {
       const uniqueQueue = Array.from(new Set(queue));
       debugLog(`[Queue] status-queue: ${JSON.stringify(uniqueQueue)}`);
@@ -137,8 +157,12 @@ export function useQueue({
       if (slot && !isInGame) {
         const host = position === 0;
         setIsHost(host);
-        setCanStartGame(host);
+        setCanStartGame(host && !startRequestedRef.current);
         setIsWaitingForApproval(true);
+
+        if (host && startRequestedRef.current) {
+          startGameWithPlayers(uniqueQueue.slice(0, MAX_PLAYERS));
+        }
         return;
       }
 
@@ -220,18 +244,12 @@ export function useQueue({
   }, [isInQueue, isInGame, name, onEnterGame, room, leaveQueue, clearApprovalWait]);
 
   const startGame = useCallback(() => {
-    const players = Array.from(new Set(queueSnapshot ?? [])).slice(0, MAX_PLAYERS);
-    const position = socket.id ? players.indexOf(socket.id) : -1;
-    const slot = getSlotFromPosition(position);
+    if (!isHost || startRequestedRef.current) return;
 
-    if (!slot || position !== 0) return;
-
-    debugLog(`[Queue] host start-game: ${JSON.stringify(players)}`);
-    socket.emit(START_GAME_EVENT, { room, players });
-    socket.emit(GAME_STARTED_EVENT, { room, players });
+    startRequestedRef.current = true;
     setCanStartGame(false);
-    onEnterGame(slot, players);
-  }, [onEnterGame, queueSnapshot, room]);
+    socket.emit("status-queue");
+  }, [isHost]);
 
   return {
     isInQueue,

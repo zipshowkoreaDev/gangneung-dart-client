@@ -9,6 +9,7 @@ import { socket } from "@/shared/socket";
 import {
   getDisplayRoom,
   getAllPlayerRooms,
+  MAX_PLAYERS,
   type PlayerSlot,
 } from "@/lib/room";
 import { getRouletteRadius } from "../three/Scene";
@@ -78,13 +79,17 @@ function buildRanking(players: PlayerScore[]) {
     }));
 }
 
-function getFinishedGamePlayers(players: Map<string, PlayerScore>) {
+function getFinishedGamePlayers(
+  players: Map<string, PlayerScore>,
+  expectedPlayerCount: number
+) {
   const slotPlayers = Array.from(players.values()).filter(
     (player) => player.slot
   );
 
   if (
     slotPlayers.length === 0 ||
+    slotPlayers.length < expectedPlayerCount ||
     slotPlayers.some((player) => player.totalThrows < 3)
   ) {
     return null;
@@ -112,6 +117,8 @@ export function useDisplaySocket({
   const gameIdRef = useRef(0);
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
   const playerAliasKeyRef = useRef<Map<string, string>>(new Map());
+  const queuedPlayerIdsRef = useRef<string[]>([]);
+  const expectedGamePlayerCountRef = useRef(0);
 
   // React state 비동기 반영 경쟁 조건 방지: 마지막 점수를 ref로 동기 추적
   const playerLastScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
@@ -220,12 +227,13 @@ export function useDisplaySocket({
       );
 
       if (!hasRegisteredPlayers || gameFinishedEmittedRef.current) {
-        gameIdRef.current += 1;
-        playerLastScoresRef.current.clear();
-        finishedPlayerKeysRef.current.clear();
-        playerAliasKeyRef.current.clear();
-        gameFinishedEmittedRef.current = false;
-        return true;
+            gameIdRef.current += 1;
+            playerLastScoresRef.current.clear();
+            finishedPlayerKeysRef.current.clear();
+            playerAliasKeyRef.current.clear();
+            expectedGamePlayerCountRef.current = queuedPlayerIdsRef.current.length;
+            gameFinishedEmittedRef.current = false;
+            return true;
       }
 
       return false;
@@ -249,6 +257,7 @@ export function useDisplaySocket({
 
     const onStatusQueue = (queue: string[]) => {
       const uniqueQueue = Array.from(new Set(queue)).filter(Boolean);
+      queuedPlayerIdsRef.current = uniqueQueue.slice(0, MAX_PLAYERS);
       onLog?.(`Queue players: ${uniqueQueue.length}`);
 
       setPlayers((prev) => {
@@ -531,7 +540,10 @@ export function useDisplaySocket({
         playersRef.current = nextPlayers;
         setPlayers(nextPlayers);
 
-        const finishedPlayers = getFinishedGamePlayers(nextPlayers);
+        const finishedPlayers = getFinishedGamePlayers(
+          nextPlayers,
+          expectedGamePlayerCountRef.current
+        );
 
         window.setTimeout(() => {
           window.dispatchEvent(
@@ -618,10 +630,21 @@ export function useDisplaySocket({
       window.dispatchEvent(new CustomEvent("GAME_FINISHED", { detail: data }));
     };
 
+    const onGameStarted = (data: { players?: string[] }) => {
+      if (Array.isArray(data.players)) {
+        const uniquePlayers = Array.from(new Set(data.players)).filter(Boolean);
+        expectedGamePlayerCountRef.current = uniquePlayers.length;
+        queuedPlayerIdsRef.current = uniquePlayers;
+        onLog?.(`Game started with expected players: ${uniquePlayers.length}`);
+      }
+    };
+
     const onResetQueue = () => {
       playerLastScoresRef.current.clear();
       playerAliasKeyRef.current.clear();
       finishedPlayerKeysRef.current.clear();
+      queuedPlayerIdsRef.current = [];
+      expectedGamePlayerCountRef.current = 0;
       gameFinishedEmittedRef.current = false;
       window.dispatchEvent(new CustomEvent("RESET_SCENE"));
     };
@@ -630,6 +653,8 @@ export function useDisplaySocket({
       playerLastScoresRef.current.clear();
       playerAliasKeyRef.current.clear();
       finishedPlayerKeysRef.current.clear();
+      queuedPlayerIdsRef.current = [];
+      expectedGamePlayerCountRef.current = 0;
       gameFinishedEmittedRef.current = false;
     };
 
@@ -643,6 +668,7 @@ export function useDisplaySocket({
     socket.on("aim-off", onAimOff);
     socket.on("game-result", onGameResult);
     socket.on("game-finished", onGameFinished);
+    socket.on("game-started", onGameStarted);
     socket.on("reset-queue", onResetQueue);
     window.addEventListener("RESET_SCENE", onResetScene);
     const queueStatusTimerId = window.setInterval(() => {
@@ -663,6 +689,7 @@ export function useDisplaySocket({
       socket.off("aim-off", onAimOff);
       socket.off("game-result", onGameResult);
       socket.off("game-finished", onGameFinished);
+      socket.off("game-started", onGameStarted);
       socket.off("reset-queue", onResetQueue);
       window.removeEventListener("RESET_SCENE", onResetScene);
     };
