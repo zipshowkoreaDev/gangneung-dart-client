@@ -67,7 +67,7 @@ describe("hooks/useRankings", () => {
       expect(result.current.rankings[2].score).toBe(50);
     });
 
-    it("Top 10만 유지", () => {
+    it("Top 3만 유지", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
@@ -86,14 +86,14 @@ describe("hooks/useRankings", () => {
         ]);
       });
 
-      expect(result.current.rankings).toHaveLength(10);
+      expect(result.current.rankings).toHaveLength(3);
       expect(result.current.rankings[0].name).toBe("P11");
       expect(result.current.rankings[0].score).toBe(110);
       // P1 (10점)은 제외됨
       expect(result.current.rankings.find((r) => r.name === "P1")).toBeUndefined();
     });
 
-    it("0점은 TOP 10에 저장하지 않음", () => {
+    it("0점은 TOP 3에 저장하지 않음", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
@@ -138,7 +138,7 @@ describe("hooks/useRankings", () => {
       ).toHaveLength(1);
     });
 
-    it("새 게임 결과는 이전 TOP 10과 통합해서 정렬", () => {
+    it("새 게임 결과는 이전 TOP 3와 통합해서 정렬", () => {
       addRanking("이전게임", 999);
       const { result } = renderHook(() => useRankings());
 
@@ -153,12 +153,11 @@ describe("hooks/useRankings", () => {
         );
       });
 
-      expect(result.current.rankings).toHaveLength(4);
+      expect(result.current.rankings).toHaveLength(3);
       expect(result.current.rankings.map((entry) => entry.name)).toEqual([
         "이전게임",
         "플레이어3",
         "플레이어2",
-        "플레이어1",
       ]);
     });
   });

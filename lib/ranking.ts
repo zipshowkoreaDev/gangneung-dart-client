@@ -1,5 +1,5 @@
 const STORAGE_KEY = "dart-ranking";
-export const RANKING_LIMIT = 10;
+export const RANKING_LIMIT = 3;
 
 export interface RankingEntry {
   name: string;

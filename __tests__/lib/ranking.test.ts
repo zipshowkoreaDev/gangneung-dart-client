@@ -53,7 +53,7 @@ describe("lib/ranking", () => {
       expect(result[0].score).toBe(100);
     });
 
-    it("R-2-2: Top 10만 유지", () => {
+    it("R-2-2: Top 3만 유지", () => {
       const result = addRankings([
         { name: "Player1", score: 10 },
         { name: "Player2", score: 20 },
@@ -68,9 +68,9 @@ describe("lib/ranking", () => {
         { name: "Player11", score: 110 },
       ]);
 
-      expect(result).toHaveLength(10);
+      expect(result).toHaveLength(3);
       expect(result[0].score).toBe(110);
-      expect(result[9].score).toBe(20);
+      expect(result[2].score).toBe(90);
       expect(result.find((entry) => entry.name === "Player1")).toBeUndefined();
     });
 
