@@ -302,6 +302,10 @@ export function useDisplaySocket({
 
       const key = resolveDisplayPlayerKey(data);
       rememberPlayerAliases(key, data);
+      if (finishedPlayerKeysRef.current.has(key)) {
+        onLog?.(`Ignored dart from finished player ${key}`);
+        return;
+      }
       if (!playersRef.current.has(key)) {
         onLog?.(`Ignored dart from unknown player ${key}`);
         return;
@@ -470,6 +474,8 @@ export function useDisplaySocket({
       playerId?: string;
       name?: string;
       socketId?: string;
+      finalScore?: number;
+      totalThrows?: number;
     }) => {
       if (!isPlayerRoomEvent(data.room)) return;
 
@@ -487,22 +493,41 @@ export function useDisplaySocket({
           return;
         }
 
-        // throw-dart와 aim-off가 같은 JS 태스크에서 처리될 경우 playersRef가 stale할 수 있으므로
-        // 동기적으로 추적한 마지막 점수를 우선 사용
         const tracked = playerLastScoresRef.current.get(key);
         const basePlayer = playersRef.current.get(key);
-        const finishedScore = tracked?.score ?? basePlayer?.score ?? 0;
+        const reportedThrows = data.totalThrows ?? basePlayer?.totalThrows ?? 0;
+        const hasFinishedTurn = reportedThrows >= 3;
+        const reportedScore = Number.isFinite(data.finalScore)
+          ? data.finalScore
+          : undefined;
+        const finishedScore = reportedScore ?? tracked?.score ?? basePlayer?.score ?? 0;
         playerLastScoresRef.current.delete(key);
-        finishedPlayerKeysRef.current.add(key);
         const nextPlayers = new Map(playersRef.current);
         const player = nextPlayers.get(key);
+
+        if (!hasFinishedTurn) {
+          if (player) {
+            nextPlayers.set(key, {
+              ...player,
+              isConnected: false,
+              isReady: false,
+              currentThrows: 0,
+            });
+          }
+          playersRef.current = nextPlayers;
+          setPlayers(nextPlayers);
+          onLog?.(`Ignored unfinished aim-off: ${key}`);
+          return;
+        }
+
+        finishedPlayerKeysRef.current.add(key);
         if (player) {
           nextPlayers.set(key, {
             ...player,
             score: finishedScore,
             isConnected: false,
             isReady: false,
-            totalThrows: Math.max(player.totalThrows, 3),
+            totalThrows: reportedThrows,
             currentThrows: 0,
           });
           onLog?.(`Aim off: ${key}`);

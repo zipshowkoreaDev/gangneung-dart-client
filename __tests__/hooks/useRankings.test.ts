@@ -93,15 +93,14 @@ describe("hooks/useRankings", () => {
       expect(result.current.rankings.find((r) => r.name === "P1")).toBeUndefined();
     });
 
-    it("0점도 정상 추가", () => {
+    it("0점은 TOP 10에 저장하지 않음", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
         result.current.handlePlayersFinish([{ name: "실패자", score: 0 }]);
       });
 
-      expect(result.current.rankings).toHaveLength(1);
-      expect(result.current.rankings[0].score).toBe(0);
+      expect(result.current.rankings).toHaveLength(0);
     });
 
     it("같은 이름도 전달된 플레이어 수만큼 저장", () => {

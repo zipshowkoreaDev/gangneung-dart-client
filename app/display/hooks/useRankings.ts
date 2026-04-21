@@ -12,11 +12,14 @@ export default function useRankings() {
 
   const handlePlayersFinish = useCallback(
     (players: Array<{ name: string; score: number }>, gameId?: string) => {
+      const entries = players.filter((player) => player.score > 0);
+      if (entries.length === 0) return;
+
       if (gameId) {
         if (savedGameIdsRef.current.has(gameId)) return;
         savedGameIdsRef.current.add(gameId);
       }
-      setRankings(addRankings(players));
+      setRankings(addRankings(entries));
     },
     []
   );
