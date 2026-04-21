@@ -6,7 +6,11 @@ import {
   useCallback,
 } from "react";
 import { socket } from "@/shared/socket";
-import { getDisplayRoom, getAllPlayerRooms } from "@/lib/room";
+import {
+  getDisplayRoom,
+  getAllPlayerRooms,
+  type PlayerSlot,
+} from "@/lib/room";
 import { getRouletteRadius } from "../three/Scene";
 import {
   clamp,
@@ -20,6 +24,7 @@ type AimState = Map<string, { x: number; y: number; skin?: string }>;
 type PlayerScore = {
   socketId?: string;
   serverName?: string;
+  slot?: PlayerSlot;
   name: string;
   score: number;
   isConnected: boolean;
@@ -34,9 +39,7 @@ interface UseDisplaySocketProps {
   setAimPositions: Dispatch<SetStateAction<AimState>>;
   setPlayers: Dispatch<SetStateAction<Map<string, PlayerScore>>>;
   setPlayerOrder: Dispatch<SetStateAction<string[]>>;
-  setPlayerRoomCounts: Dispatch<SetStateAction<Map<string, number>>>;
   players: Map<string, PlayerScore>;
-  playerOrder: string[];
   onPlayerFinish?: (name: string, score: number) => void;
 }
 
@@ -71,14 +74,12 @@ export function useDisplaySocket({
   setAimPositions,
   setPlayers,
   setPlayerOrder,
-  setPlayerRoomCounts,
   players,
-  playerOrder,
   onPlayerFinish,
 }: UseDisplaySocketProps) {
   const playersRef = useRef(players);
-  const playerOrderRef = useRef(playerOrder);
   const onPlayerFinishRef = useRef(onPlayerFinish);
+  const gameFinishedEmittedRef = useRef(false);
 
   // React state 비동기 반영 경쟁 조건 방지: 점수를 ref로 동기 추적
   const playerScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
@@ -88,25 +89,18 @@ export function useDisplaySocket({
   }, [players]);
 
   useEffect(() => {
-    playerOrderRef.current = playerOrder;
-  }, [playerOrder]);
-
-  useEffect(() => {
     onPlayerFinishRef.current = onPlayerFinish;
   }, [onPlayerFinish]);
 
   const emitFinishGame = useCallback(
-    (targetRoom: string, player: PlayerScore, socketId?: string) => {
+    (targetRoom: string, finishedPlayers: PlayerScore[]) => {
       socket.emit("finish-game", {
         room: targetRoom,
-        scores: [
-          {
-            socketId:
-              socketId ?? player.socketId ?? player.serverName ?? player.name,
-            name: player.name,
-            score: player.score,
-          },
-        ],
+        scores: finishedPlayers.map((player) => ({
+          socketId: player.socketId ?? player.serverName ?? player.name,
+          name: player.name,
+          score: player.score,
+        })),
       });
     },
     []
@@ -162,14 +156,6 @@ export function useDisplaySocket({
 
     const onRoomPlayerCount = (data: { room: string; playerCount: number }) => {
       logPlayerCount("Player count", data);
-      if (!data.room || !playerRoomSet.has(data.room)) return;
-
-      const actualPlayerCount = Math.max(0, data.playerCount - 1);
-      setPlayerRoomCounts((prev) => {
-        const next = new Map(prev);
-        next.set(data.room, actualPlayerCount);
-        return next;
-      });
     };
 
     const onDartThrown = (data: {
@@ -238,6 +224,7 @@ export function useDisplaySocket({
       name?: string;
       socketId?: string;
       skin?: string;
+      registration?: boolean;
       aim: { x: number; y: number };
     }) => {
       if (!isPlayerRoomEvent(data.room)) return;
@@ -246,9 +233,16 @@ export function useDisplaySocket({
       const x = clamp(data.aim?.x ?? 0, -1, 1);
       const y = clamp(data.aim?.y ?? 0, -1, 1);
       const displayName = data.name ? stripDisplayName(data.name) : key;
+      const slotIndex = data.room ? playerRooms.indexOf(data.room) : -1;
+      const slot =
+        slotIndex >= 0 ? ((slotIndex + 1) as PlayerSlot) : undefined;
+      const isRegistration = data.registration === true;
 
       if (key && key !== "_display") {
-        let shouldUpdateAim = true;
+        if (isRegistration) {
+          gameFinishedEmittedRef.current = false;
+        }
+        let shouldUpdateAim = !isRegistration;
         let addedPlayer = false;
 
         setPlayers((prev) => {
@@ -262,8 +256,9 @@ export function useDisplaySocket({
             }
             next.set(key, {
               ...existing,
+              slot: slot ?? existing.slot,
               isConnected: true,
-              isReady: true,
+              isReady: isRegistration ? existing.isReady : true,
               socketId: data.socketId ?? existing.socketId,
               serverName: data.name ?? existing.serverName,
               name: displayName ?? existing.name,
@@ -275,10 +270,11 @@ export function useDisplaySocket({
             next.set(key, {
               socketId: data.socketId,
               serverName: data.name,
+              slot,
               name: displayName,
               score: 0,
               isConnected: true,
-              isReady: true,
+              isReady: !isRegistration,
               totalThrows: 0,
               currentThrows: 0,
             });
@@ -329,6 +325,7 @@ export function useDisplaySocket({
         const finishedName = tracked?.name ?? basePlayer?.name;
         const finishedScore = tracked?.score ?? basePlayer?.score ?? 0;
         playerScoresRef.current.delete(key);
+        let finishedPlayers: PlayerScore[] | null = null;
 
         setPlayers((prev) => {
           const next = new Map(prev);
@@ -344,6 +341,17 @@ export function useDisplaySocket({
             });
             onLog?.(`Aim off: ${key}`);
           }
+          const registeredPlayers = Array.from(next.values()).filter(
+            (registeredPlayer) => registeredPlayer.slot
+          );
+          const everyRegisteredPlayerFinished =
+            registeredPlayers.length > 0 &&
+            registeredPlayers.every(
+              (registeredPlayer) => registeredPlayer.totalThrows >= 3
+            );
+          if (everyRegisteredPlayerFinished) {
+            finishedPlayers = registeredPlayers;
+          }
           return next;
         });
         window.setTimeout(() => {
@@ -352,9 +360,16 @@ export function useDisplaySocket({
           );
         }, CLEAR_DARTS_DELAY_MS);
 
-        if (data.room && basePlayer && finishedName) {
-          emitFinishGame(data.room, { ...basePlayer, name: finishedName, score: finishedScore }, data.socketId);
+        if (basePlayer && finishedName) {
           onPlayerFinishRef.current?.(finishedName, finishedScore);
+        }
+        if (
+          data.room &&
+          finishedPlayers &&
+          !gameFinishedEmittedRef.current
+        ) {
+          gameFinishedEmittedRef.current = true;
+          emitFinishGame(data.room, finishedPlayers);
         }
       }
     };
@@ -443,7 +458,6 @@ export function useDisplaySocket({
     setAimPositions,
     setPlayers,
     setPlayerOrder,
-    setPlayerRoomCounts,
     emitFinishGame,
   ]);
 

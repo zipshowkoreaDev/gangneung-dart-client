@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
@@ -103,16 +103,17 @@ function Roulette({
   stuckDarts: ThrownDart[];
 }) {
   const { scene } = useGLTF("/models/roulette.glb");
+  const rouletteScene = useMemo(() => scene.clone(true), [scene]);
 
   useEffect(() => {
-    const box = new THREE.Box3().setFromObject(scene);
+    const box = new THREE.Box3().setFromObject(rouletteScene);
     const size = box.getSize(new THREE.Vector3());
     cachedRouletteRadius = Math.max(size.x, size.y) / 2;
-  }, [scene]);
+  }, [rouletteScene]);
 
   return (
     <group>
-      <primitive object={scene} rotation={[0, -Math.PI / 2, 0]} />
+      <primitive object={rouletteScene} rotation={[0, -Math.PI / 2, 0]} />
 
       {flyingDarts.map((dart) => (
         <FlyingDart

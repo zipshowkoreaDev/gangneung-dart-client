@@ -1,9 +1,11 @@
 "use client";
 
 import { MAX_PLAYERS } from "@/lib/room";
+import type { PlayerSlot } from "@/lib/room";
 
 type PlayerScore = {
   socketId?: string;
+  slot?: PlayerSlot;
   name: string;
   score: number;
   isConnected: boolean;
@@ -20,10 +22,10 @@ export default function Scoreboard({
   players,
 }: ScoreboardProps) {
   const playerList = Array.from(players.values());
-  const slots = Array.from(
-    { length: MAX_PLAYERS },
-    (_, index) => playerList[index]
-  );
+  const slots = Array.from({ length: MAX_PLAYERS }, (_, index) => {
+    const slot = (index + 1) as PlayerSlot;
+    return playerList.find((player) => player.slot === slot);
+  });
 
   const renderPlayerCard = (player: PlayerScore | undefined, index: number) => {
     const hasPlayed = player ? player.totalThrows >= 3 : false;

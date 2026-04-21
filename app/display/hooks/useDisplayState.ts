@@ -9,9 +9,6 @@ export default function useDisplayState() {
     () => new Map()
   );
   const [playerOrder, setPlayerOrder] = useState<string[]>([]);
-  const [, setPlayerRoomCounts] = useState<Map<string, number>>(
-    () => new Map()
-  );
 
   return {
     aimPositions,
@@ -20,6 +17,5 @@ export default function useDisplayState() {
     setPlayers,
     playerOrder,
     setPlayerOrder,
-    setPlayerRoomCounts,
   };
 }

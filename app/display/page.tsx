@@ -29,7 +29,6 @@ export default function DisplayPage() {
     setPlayers,
     playerOrder,
     setPlayerOrder,
-    setPlayerRoomCounts,
   } = useDisplayState();
   const { rankings, handlePlayerFinish } = useRankings();
 
@@ -42,9 +41,7 @@ export default function DisplayPage() {
     setAimPositions,
     setPlayers,
     setPlayerOrder,
-    setPlayerRoomCounts,
     players,
-    playerOrder,
     onPlayerFinish: handlePlayerFinish,
   });
 
@@ -80,6 +77,9 @@ export default function DisplayPage() {
         setIsGameActive(false);
         setWinner(null);
         setEndCountdown(null);
+        setPlayers(new Map());
+        setPlayerOrder([]);
+        setAimPositions(new Map());
         window.dispatchEvent(new CustomEvent("RESET_SCENE"));
       }, 0);
       return () => window.clearTimeout(timer);
@@ -90,7 +90,7 @@ export default function DisplayPage() {
       1000
     );
     return () => window.clearTimeout(timer);
-  }, [endCountdown]);
+  }, [endCountdown, setAimPositions, setPlayerOrder, setPlayers]);
 
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-black overflow-hidden">

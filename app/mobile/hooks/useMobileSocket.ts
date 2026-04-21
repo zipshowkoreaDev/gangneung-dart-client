@@ -86,6 +86,13 @@ export function useMobileSocket({
         socket.emit("joinRoom", { room: targetRoom, name });
         joinedRoomsRef.current.add(targetRoom);
       });
+      socket.emit("aim-update", {
+        room: playerRoom,
+        socketId: socket.id,
+        name,
+        aim: { x: 0, y: 0 },
+        registration: true,
+      });
       hasJoinedRef.current = true;
       currentRoomRef.current = playerRoom;
     };
