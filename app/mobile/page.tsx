@@ -18,7 +18,6 @@ import GameScreen from "./components/GameScreen";
 import ResultScreen from "./components/ResultScreen";
 import WaitingScreen from "./components/WaitingScreen";
 import QueueLoading from "./components/QueueLoading";
-import DebugOverlay from "./components/DebugOverlay";
 export default function MobilePage() {
   const [sessionValid] = useState<boolean | null>(() =>
     getQRSession() !== null ? true : false
@@ -197,7 +196,6 @@ export default function MobilePage() {
     hasApprovalWait;
   return (
     <div className="h-screen flex flex-col items-center justify-center gap-8 bg-gradient-to-br from-[#1e3c72] to-[#2a5298] px-5">
-      <DebugOverlay />
       {sessionValid === null && <SessionValidating />}
       {sessionValid === false && <AccessDenied />}
 

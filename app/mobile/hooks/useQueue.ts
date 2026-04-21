@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { socket } from "@/shared/socket";
 import { getSlotFromPosition, MAX_PLAYERS, type PlayerSlot } from "@/lib/room";
-import { debugLog } from "../components/DebugOverlay";
+import { debugLog } from "@/app/mobile/debugLog";
 
 const QUEUE_TIMEOUT_MS = 2 * 60 * 1000;
 const AUTO_APPROVAL_DELAY_MS = 30 * 1000;

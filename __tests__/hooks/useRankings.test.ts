@@ -104,7 +104,7 @@ describe("hooks/useRankings", () => {
       expect(result.current.rankings[0].score).toBe(0);
     });
 
-    it("같은 이름으로 여러 번 추가 가능", () => {
+    it("같은 이름이 여러 번 들어오면 마지막 점수만 저장", () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
@@ -114,9 +114,28 @@ describe("hooks/useRankings", () => {
         ]);
       });
 
-      expect(result.current.rankings).toHaveLength(2);
+      expect(result.current.rankings).toHaveLength(1);
       expect(result.current.rankings[0].score).toBe(100);
-      expect(result.current.rankings[1].score).toBe(50);
+    });
+
+    it("같은 종료 결과가 반복되면 중복 저장하지 않음", () => {
+      const { result } = renderHook(() => useRankings());
+      const players = [
+        { name: "홍길동", score: 50 },
+        { name: "김철수", score: 30 },
+      ];
+
+      act(() => {
+        result.current.handlePlayersFinish(players);
+      });
+      act(() => {
+        result.current.handlePlayersFinish(players);
+      });
+
+      expect(result.current.rankings).toHaveLength(2);
+      expect(
+        result.current.rankings.filter((r) => r.name === "홍길동")
+      ).toHaveLength(1);
     });
   });
 

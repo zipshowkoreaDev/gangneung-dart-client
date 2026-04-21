@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import { debugLog } from "@/app/mobile/components/DebugOverlay";
+import { debugLog } from "@/app/mobile/debugLog";
 
 type UseStartExitFlowParams = {
   errorMessage: string;

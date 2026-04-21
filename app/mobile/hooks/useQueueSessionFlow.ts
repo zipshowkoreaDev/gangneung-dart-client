@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useQueue } from "@/app/mobile/hooks/useQueue";
-import { debugLog } from "@/app/mobile/components/DebugOverlay";
+import { debugLog } from "@/app/mobile/debugLog";
 import type { PlayerSlot } from "@/lib/room";
 
 type UseQueueSessionFlowParams = {

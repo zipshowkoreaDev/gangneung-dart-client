@@ -95,6 +95,7 @@ export function useDisplaySocket({
   const onPlayersFinishRef = useRef(onPlayersFinish);
   const gameFinishedEmittedRef = useRef(false);
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
+  const playerAliasKeyRef = useRef<Map<string, string>>(new Map());
 
   // React state 비동기 반영 경쟁 조건 방지: 마지막 점수를 ref로 동기 추적
   const playerLastScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
@@ -140,7 +141,34 @@ export function useDisplaySocket({
       playerId?: string;
       name?: string;
       socketId?: string;
-    }) => getSlotPlayerKey(getRoomSlot(data.room)) ?? resolvePlayerKey(data);
+    }) => {
+      const slotKey = getSlotPlayerKey(getRoomSlot(data.room));
+      if (slotKey) return slotKey;
+
+      const aliases = [data.socketId, data.playerId, data.name].filter(
+        Boolean
+      ) as string[];
+      for (const alias of aliases) {
+        const mappedKey = playerAliasKeyRef.current.get(alias);
+        if (mappedKey) return mappedKey;
+      }
+
+      return resolvePlayerKey(data);
+    };
+    const rememberPlayerAliases = (
+      key: string,
+      data: {
+        playerId?: string;
+        name?: string;
+        socketId?: string;
+      }
+    ) => {
+      [data.socketId, data.playerId, data.name]
+        .filter(Boolean)
+        .forEach((alias) => {
+          playerAliasKeyRef.current.set(alias as string, key);
+        });
+    };
 
     const logPlayerCount = (
       label: string,
@@ -194,6 +222,7 @@ export function useDisplaySocket({
       if (!isPlayerRoomEvent(data.room)) return;
 
       const key = resolveDisplayPlayerKey(data);
+      rememberPlayerAliases(key, data);
       if (!playersRef.current.has(key)) {
         onLog?.(`Ignored dart from unknown player ${key}`);
         return;
@@ -257,6 +286,7 @@ export function useDisplaySocket({
       if (!isPlayerRoomEvent(data.room)) return;
 
       const key = resolveDisplayPlayerKey(data);
+      rememberPlayerAliases(key, data);
       const x = clamp(data.aim?.x ?? 0, -1, 1);
       const y = clamp(data.aim?.y ?? 0, -1, 1);
       const displayName = data.name ? stripDisplayName(data.name) : key;
@@ -339,6 +369,7 @@ export function useDisplaySocket({
       if (!isPlayerRoomEvent(data.room)) return;
 
       const key = resolveDisplayPlayerKey(data);
+      rememberPlayerAliases(key, data);
       setAimPositions((prev) => {
         const next = new Map(prev);
         next.delete(key);
@@ -471,6 +502,7 @@ export function useDisplaySocket({
 
     const onResetQueue = () => {
       playerLastScoresRef.current.clear();
+      playerAliasKeyRef.current.clear();
       finishedPlayerKeysRef.current.clear();
       gameFinishedEmittedRef.current = false;
       window.dispatchEvent(new CustomEvent("RESET_SCENE"));
@@ -478,6 +510,7 @@ export function useDisplaySocket({
 
     const onResetScene = () => {
       playerLastScoresRef.current.clear();
+      playerAliasKeyRef.current.clear();
       finishedPlayerKeysRef.current.clear();
       gameFinishedEmittedRef.current = false;
     };

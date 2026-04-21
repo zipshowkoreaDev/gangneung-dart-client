@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { socket } from "@/shared/socket";
-import { debugLog } from "../components/DebugOverlay";
+import { debugLog } from "@/app/mobile/debugLog";
 
 interface UsePageLeaveProps {
   joinedQueueRef: React.MutableRefObject<boolean>;
