@@ -90,6 +90,7 @@ export function useDisplaySocket({
   const playersRef = useRef(players);
   const onPlayerFinishRef = useRef(onPlayerFinish);
   const gameFinishedEmittedRef = useRef(false);
+  const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
 
   // React state 비동기 반영 경쟁 조건 방지: 점수를 ref로 동기 추적
   const playerScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
@@ -184,8 +185,10 @@ export function useDisplaySocket({
         return;
       }
 
-      const isInsideBounds = isAimInsideDisplayBounds(data.aim);
-      const score = isInsideBounds ? getHitScoreFromAim(data.aim) : 0;
+      const fallbackScore = isAimInsideDisplayBounds(data.aim)
+        ? getHitScoreFromAim(data.aim)
+        : 0;
+      const score = Number.isFinite(data.score) ? data.score : fallbackScore;
       const hitSound = new Audio("/sound/hit.mp3");
       hitSound.play().catch((e) => {
         onLog?.(`Sound play failed: ${String(e)}`);
@@ -197,31 +200,29 @@ export function useDisplaySocket({
         return next;
       });
 
-      setPlayers((prev) => {
-        const next = new Map(prev);
-        const player = prev.get(key);
+      const nextPlayers = new Map(playersRef.current);
+      const player = nextPlayers.get(key);
 
-        if (player) {
-          const newCurrentThrows = player.currentThrows + 1;
-          const isLastThrow = newCurrentThrows >= 3;
-          const newScore = player.score + score;
+      if (player) {
+        const newCurrentThrows = player.currentThrows + 1;
+        const isLastThrow = newCurrentThrows >= 3;
+        const newScore = player.score + score;
 
-          // React 상태 반영 전 onAimOff가 먼저 실행되는 경쟁 조건 방지
-          playerScoresRef.current.set(key, { name: player.name, score: newScore });
+        // React 상태 반영 전 onAimOff가 먼저 실행되는 경쟁 조건 방지
+        playerScoresRef.current.set(key, { name: player.name, score: newScore });
 
-          next.set(key, {
-            ...player,
-            score: newScore,
-            totalThrows: player.totalThrows + 1,
-            currentThrows: isLastThrow ? 0 : newCurrentThrows,
-          });
-          onLog?.(
-            `Score: ${player.name} ${player.score} -> ${newScore} (Throw ${newCurrentThrows}/3)`
-          );
-        }
-
-        return next;
-      });
+        nextPlayers.set(key, {
+          ...player,
+          score: newScore,
+          totalThrows: player.totalThrows + 1,
+          currentThrows: isLastThrow ? 0 : newCurrentThrows,
+        });
+        playersRef.current = nextPlayers;
+        setPlayers(nextPlayers);
+        onLog?.(
+          `Score: ${player.name} ${player.score} -> ${newScore} (Throw ${newCurrentThrows}/3)`
+        );
+      }
 
       window.dispatchEvent(
         new CustomEvent("DART_THROW", { detail: { ...data, score } })
@@ -251,6 +252,7 @@ export function useDisplaySocket({
       if (key && key !== "_display") {
         if (isRegistration) {
           gameFinishedEmittedRef.current = false;
+          finishedPlayerKeysRef.current.delete(key);
         }
         let shouldUpdateAim = !isRegistration;
         let addedPlayer = false;
@@ -328,6 +330,11 @@ export function useDisplaySocket({
       });
 
       if (key !== "_display") {
+        if (finishedPlayerKeysRef.current.has(key)) {
+          onLog?.(`Ignored duplicate aim-off: ${key}`);
+          return;
+        }
+
         // throw-dart와 aim-off가 같은 JS 태스크에서 처리될 경우 playersRef가 stale할 수 있으므로
         // 동기적으로 누적한 playerScoresRef 값을 우선 사용
         const tracked = playerScoresRef.current.get(key);
@@ -335,6 +342,7 @@ export function useDisplaySocket({
         const finishedName = tracked?.name ?? basePlayer?.name;
         const finishedScore = tracked?.score ?? basePlayer?.score ?? 0;
         playerScoresRef.current.delete(key);
+        finishedPlayerKeysRef.current.add(key);
         const nextPlayers = new Map(playersRef.current);
         const player = nextPlayers.get(key);
         if (player) {
@@ -443,7 +451,16 @@ export function useDisplaySocket({
     };
 
     const onResetQueue = () => {
+      playerScoresRef.current.clear();
+      finishedPlayerKeysRef.current.clear();
+      gameFinishedEmittedRef.current = false;
       window.dispatchEvent(new CustomEvent("RESET_SCENE"));
+    };
+
+    const onResetScene = () => {
+      playerScoresRef.current.clear();
+      finishedPlayerKeysRef.current.clear();
+      gameFinishedEmittedRef.current = false;
     };
 
     socket.on("connect", onConnect);
@@ -456,6 +473,7 @@ export function useDisplaySocket({
     socket.on("game-result", onGameResult);
     socket.on("game-finished", onGameFinished);
     socket.on("reset-queue", onResetQueue);
+    window.addEventListener("RESET_SCENE", onResetScene);
 
     return () => {
       socket.off("connect", onConnect);
@@ -468,6 +486,7 @@ export function useDisplaySocket({
       socket.off("game-result", onGameResult);
       socket.off("game-finished", onGameFinished);
       socket.off("reset-queue", onResetQueue);
+      window.removeEventListener("RESET_SCENE", onResetScene);
     };
   }, [
     room,
