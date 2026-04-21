@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import useProfanityCheck from "./useProfanityCheck";
+import { MAX_PLAYER_NAME_LENGTH } from "../constants";
 
 type UseNameInputFlowReturn = {
   name: string;
@@ -15,7 +16,8 @@ export default function useNameInputFlow(): UseNameInputFlowReturn {
   const { validateInput } = useProfanityCheck();
 
   const setName = (value: string) => {
-    const trimmed = value.trim();
+    const limitedValue = value.slice(0, MAX_PLAYER_NAME_LENGTH);
+    const trimmed = limitedValue.trim();
     if (!trimmed) {
       setNameState("");
       setNameSuffix("");
@@ -24,7 +26,7 @@ export default function useNameInputFlow(): UseNameInputFlowReturn {
     if (!nameSuffix) {
       setNameSuffix(Math.random().toString(36).slice(2, 6));
     }
-    setNameState(value);
+    setNameState(limitedValue);
   };
 
   const socketName = useMemo(() => {

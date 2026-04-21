@@ -1,3 +1,5 @@
+import { MAX_PLAYER_NAME_LENGTH } from "../constants";
+
 interface NameInputProps {
   name: string;
   onNameChange: (name: string) => void;
@@ -22,10 +24,13 @@ export default function NameInput({
           type="text"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="이름 입력 (5글자 이내)"
-          maxLength={5}
+          placeholder={`이름 입력 (${MAX_PLAYER_NAME_LENGTH}글자 이내)`}
+          maxLength={MAX_PLAYER_NAME_LENGTH}
           className="w-full py-4 px-5 text-lg text-center rounded-xl border-2 border-white/30 bg-white/10 text-white placeholder-white/50 backdrop-blur-sm focus:outline-none focus:border-white/50"
         />
+        <div className="text-sm text-white/70 text-center">
+          이름은 {MAX_PLAYER_NAME_LENGTH}글자 이내로 입력해주세요.
+        </div>
         {errorMessage && (
           <div className="text-sm text-red-200 text-center">{errorMessage}</div>
         )}
