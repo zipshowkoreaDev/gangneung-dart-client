@@ -5,6 +5,7 @@ import { useMobileSocket } from "./hooks/useMobileSocket";
 import { useGyroscope } from "./hooks/useGyroscope";
 import { getQRSession } from "@/lib/session";
 import { getRoomFromUrl, MAX_PLAYERS, type PlayerSlot } from "@/lib/room";
+import { socket } from "@/shared/socket";
 import { usePageLeave } from "./hooks/usePageLeave";
 import useNameInputFlow from "./hooks/useNameInputFlow";
 import useGameLifecycle from "./hooks/useGameLifecycle";
@@ -40,6 +41,9 @@ export default function MobilePage() {
     () => new Set()
   );
   const [endCountdown, setEndCountdown] = useState<number | null>(null);
+  const [canJoinCurrentGame, setCanJoinCurrentGame] = useState<boolean | null>(
+    null
+  );
 
   const handlePlayerFinished = useCallback((playerId: string) => {
     setFinishedPlayers((prev) => {
@@ -88,9 +92,12 @@ export default function MobilePage() {
     queuePosition,
     queueSnapshot,
     isWaitingForApproval: hasApprovalWait,
+    isHost,
+    canStartGame,
     joinedQueueRef,
     connectAndJoinQueue,
     leaveQueue,
+    startGame,
   } = useQueueSessionFlow({
     room,
     name: socketName,
@@ -102,6 +109,49 @@ export default function MobilePage() {
   });
 
   usePageLeave({ joinedQueueRef });
+
+  useEffect(() => {
+    if (sessionValid !== true || isInQueue || isInGame) return;
+
+    const updateJoinAvailability = (queue: string[]) => {
+      const uniqueQueue = Array.from(new Set(queue));
+      setCanJoinCurrentGame(uniqueQueue.length < MAX_PLAYERS);
+    };
+
+    const handleGameStarted = () => {
+      setCanJoinCurrentGame(false);
+    };
+
+    const handleGameEnded = () => {
+      setCanJoinCurrentGame(true);
+      socket.emit("status-queue");
+    };
+
+    if (!socket.connected) {
+      socket.io.opts.query = { room, name: "_mobile_status" };
+      socket.connect();
+    }
+
+    socket.on("status-queue", updateJoinAvailability);
+    socket.on("game-started", handleGameStarted);
+    socket.on("game-finished", handleGameEnded);
+    socket.on("reset-queue", handleGameEnded);
+    socket.emit("status-queue");
+
+    const timerId = window.setInterval(() => {
+      if (socket.connected) {
+        socket.emit("status-queue");
+      }
+    }, 3000);
+
+    return () => {
+      window.clearInterval(timerId);
+      socket.off("status-queue", updateJoinAvailability);
+      socket.off("game-started", handleGameStarted);
+      socket.off("game-finished", handleGameEnded);
+      socket.off("reset-queue", handleGameEnded);
+    };
+  }, [isInGame, isInQueue, room, sessionValid]);
 
   useGameLifecycle({
     stopSensors,
@@ -194,6 +244,18 @@ export default function MobilePage() {
     queuePosition >= 0 &&
     queuePosition < MAX_PLAYERS &&
     hasApprovalWait;
+  const shouldBlockNewEntry =
+    sessionValid === true &&
+    !isInQueue &&
+    !hasFinishedTurn &&
+    !isInGame &&
+    canJoinCurrentGame === false;
+  const isCheckingJoinAvailability =
+    sessionValid === true &&
+    !isInQueue &&
+    !hasFinishedTurn &&
+    !isInGame &&
+    canJoinCurrentGame === null;
   return (
     <div className="h-screen flex flex-col items-center justify-center gap-8 bg-gradient-to-br from-[#1e3c72] to-[#2a5298] px-5">
       {sessionValid === null && <SessionValidating />}
@@ -212,8 +274,15 @@ export default function MobilePage() {
 
       {sessionValid === true && isWaitingForApproval && (
         <QueueLoading
-          title="플레이어 참여 대기 중"
-          message={`${MAX_PLAYERS}명이 모이면 바로 시작합니다. 모이지 않으면 30초 후 자동 시작됩니다.`}
+          title={isHost ? "참가자 대기 중" : "게임 시작 대기 중"}
+          message={
+            isHost
+              ? "참가자가 준비되면 게임을 시작하세요."
+              : "1번 참가자가 게임을 시작할 때까지 기다려주세요."
+          }
+          actionLabel={isHost ? "게임 시작" : undefined}
+          onAction={isHost ? startGame : undefined}
+          actionDisabled={!canStartGame}
         />
       )}
 
@@ -251,7 +320,25 @@ export default function MobilePage() {
         />
       )}
 
-      {sessionValid === true && !isInQueue && !hasFinishedTurn && !isInGame && (
+      {shouldBlockNewEntry && (
+        <QueueLoading
+          title="현재 참여할 수 없습니다"
+          message="이번 게임이 끝나면 다시 참여할 수 있습니다."
+        />
+      )}
+
+      {isCheckingJoinAvailability && (
+        <QueueLoading
+          title="참여 상태 확인 중"
+          message="현재 게임 참가 가능 여부를 확인하고 있습니다."
+        />
+      )}
+
+      {sessionValid === true &&
+        !isInQueue &&
+        !hasFinishedTurn &&
+        !isInGame &&
+        canJoinCurrentGame === true && (
         <NameInput
           name={customName}
           onNameChange={handleNameChange}

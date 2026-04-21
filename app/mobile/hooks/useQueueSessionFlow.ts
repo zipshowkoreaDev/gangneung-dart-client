@@ -18,9 +18,12 @@ type UseQueueSessionFlowReturn = {
   queuePosition: number | null;
   queueSnapshot: string[] | null;
   isWaitingForApproval: boolean;
+  isHost: boolean;
+  canStartGame: boolean;
   joinedQueueRef: React.MutableRefObject<boolean>;
   connectAndJoinQueue: () => void;
   leaveQueue: () => void;
+  startGame: () => void;
 };
 
 export default function useQueueSessionFlow({
@@ -48,9 +51,12 @@ export default function useQueueSessionFlow({
     queuePosition,
     queueSnapshot,
     isWaitingForApproval,
+    isHost,
+    canStartGame,
     joinedQueueRef,
     leaveQueue,
     connectAndJoinQueue,
+    startGame,
   } = useQueue({
     room,
     name,
@@ -63,8 +69,11 @@ export default function useQueueSessionFlow({
     queuePosition,
     queueSnapshot,
     isWaitingForApproval,
+    isHost,
+    canStartGame,
     joinedQueueRef,
     connectAndJoinQueue,
     leaveQueue,
+    startGame,
   };
 }

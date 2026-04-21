@@ -6,7 +6,8 @@ import { getSlotFromPosition, MAX_PLAYERS, type PlayerSlot } from "@/lib/room";
 import { debugLog } from "@/app/mobile/debugLog";
 
 const QUEUE_TIMEOUT_MS = 2 * 60 * 1000;
-const AUTO_APPROVAL_DELAY_MS = 30 * 1000;
+const GAME_STARTED_EVENT = "game-started";
+const START_GAME_EVENT = "start-game";
 
 interface UseQueueProps {
   room: string;
@@ -20,9 +21,12 @@ interface UseQueueReturn {
   queuePosition: number | null;
   queueSnapshot: string[] | null;
   isWaitingForApproval: boolean;
+  isHost: boolean;
+  canStartGame: boolean;
   joinedQueueRef: React.MutableRefObject<boolean>;
   leaveQueue: () => void;
   connectAndJoinQueue: () => void;
+  startGame: () => void;
 }
 
 // 대기열 관리 hook
@@ -36,24 +40,17 @@ export function useQueue({
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [queueSnapshot, setQueueSnapshot] = useState<string[] | null>(null);
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
+  const [isHost, setIsHost] = useState(false);
+  const [canStartGame, setCanStartGame] = useState(false);
   const joinedQueueRef = useRef(false);
   const lastRejoinAtRef = useRef(0);
   const queueStartAtRef = useRef<number | null>(null);
-  const approvalStartAtRef = useRef<number | null>(null);
-  const approvalTimeoutRef = useRef<number | null>(null);
-  const pendingSlotRef = useRef<PlayerSlot | null>(null);
-  const pendingPlayersRef = useRef<string[]>([]);
   const lastJoinedSocketIdRef = useRef<string | null>(null);
 
   const clearApprovalWait = useCallback(() => {
-    if (approvalTimeoutRef.current !== null) {
-      window.clearTimeout(approvalTimeoutRef.current);
-      approvalTimeoutRef.current = null;
-    }
-    approvalStartAtRef.current = null;
-    pendingSlotRef.current = null;
-    pendingPlayersRef.current = [];
     setIsWaitingForApproval(false);
+    setIsHost(false);
+    setCanStartGame(false);
   }, []);
 
   const leaveQueue = useCallback(() => {
@@ -65,6 +62,8 @@ export function useQueue({
     setIsInQueue(false);
     setQueuePosition(null);
     setQueueSnapshot(null);
+    setIsHost(false);
+    setCanStartGame(false);
     queueStartAtRef.current = null;
     clearApprovalWait();
   }, [clearApprovalWait]);
@@ -102,35 +101,10 @@ export function useQueue({
       return idx >= 0 ? idx : -1;
     };
 
-    const getGamePlayers = (queue: string[]) => queue.slice(0, MAX_PLAYERS);
-
     const enterGame = (slot: PlayerSlot, players: string[]) => {
       clearApprovalWait();
       debugLog(`[Queue] 게임 시작 승인, 슬롯: ${slot}`);
       onEnterGame(slot, players);
-    };
-
-    const waitForAutoApproval = (slot: PlayerSlot, players: string[]) => {
-      pendingSlotRef.current = slot;
-      pendingPlayersRef.current = players;
-
-      if (!approvalStartAtRef.current) {
-        approvalStartAtRef.current = Date.now();
-        debugLog("[Queue] 자동 승인 대기 시작");
-      }
-
-      setIsWaitingForApproval(true);
-
-      if (approvalTimeoutRef.current === null) {
-        const elapsed = Date.now() - approvalStartAtRef.current;
-        const remaining = Math.max(0, AUTO_APPROVAL_DELAY_MS - elapsed);
-        approvalTimeoutRef.current = window.setTimeout(() => {
-          const approvedSlot = pendingSlotRef.current;
-          if (approvedSlot && !isInGame) {
-            enterGame(approvedSlot, pendingPlayersRef.current);
-          }
-        }, remaining);
-      }
     };
 
     const onStatusQueue = (queue: string[]) => {
@@ -161,18 +135,29 @@ export function useQueue({
 
       const slot = getSlotFromPosition(position);
       if (slot && !isInGame) {
-        if (uniqueQueue.length >= MAX_PLAYERS) {
-          debugLog(`[Queue] 4명 충족 - 즉시 시작, 슬롯: ${slot}`);
-          enterGame(slot, getGamePlayers(uniqueQueue));
-          return;
-        }
-
-        debugLog(`[Queue] 자동 승인 대기 중, 슬롯: ${slot}`);
-        waitForAutoApproval(slot, getGamePlayers(uniqueQueue));
+        const host = position === 0;
+        setIsHost(host);
+        setCanStartGame(host);
+        setIsWaitingForApproval(true);
         return;
       }
 
       clearApprovalWait();
+    };
+
+    const onGameStarted = (data: { players?: string[] }) => {
+      const players = Array.isArray(data.players)
+        ? Array.from(new Set(data.players)).slice(0, MAX_PLAYERS)
+        : [];
+      const position = socket.id ? players.indexOf(socket.id) : -1;
+      const slot = getSlotFromPosition(position);
+
+      if (!slot) {
+        clearApprovalWait();
+        return;
+      }
+
+      enterGame(slot, players);
     };
 
     const onConnect = () => {
@@ -201,6 +186,7 @@ export function useQueue({
     socket.on("connect_error", onConnectError);
     socket.on("error", onError);
     socket.on("status-queue", onStatusQueue);
+    socket.on(GAME_STARTED_EVENT, onGameStarted);
 
     const heartbeatId = window.setInterval(() => {
       if (!socket.connected || !joinedQueueRef.current) return;
@@ -229,16 +215,34 @@ export function useQueue({
       socket.off("connect_error", onConnectError);
       socket.off("error", onError);
       socket.off("status-queue", onStatusQueue);
+      socket.off(GAME_STARTED_EVENT, onGameStarted);
     };
   }, [isInQueue, isInGame, name, onEnterGame, room, leaveQueue, clearApprovalWait]);
+
+  const startGame = useCallback(() => {
+    const players = Array.from(new Set(queueSnapshot ?? [])).slice(0, MAX_PLAYERS);
+    const position = socket.id ? players.indexOf(socket.id) : -1;
+    const slot = getSlotFromPosition(position);
+
+    if (!slot || position !== 0) return;
+
+    debugLog(`[Queue] host start-game: ${JSON.stringify(players)}`);
+    socket.emit(START_GAME_EVENT, { room, players });
+    socket.emit(GAME_STARTED_EVENT, { room, players });
+    setCanStartGame(false);
+    onEnterGame(slot, players);
+  }, [onEnterGame, queueSnapshot, room]);
 
   return {
     isInQueue,
     queuePosition,
     queueSnapshot,
     isWaitingForApproval,
+    isHost,
+    canStartGame,
     joinedQueueRef,
     leaveQueue,
     connectAndJoinQueue,
+    startGame,
   };
 }
