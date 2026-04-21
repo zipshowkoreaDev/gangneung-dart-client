@@ -60,7 +60,9 @@ export default function Scoreboard({
     <div className="absolute top-0 left-0 w-full bg-white/20 backdrop-blur-md flex gap-5 p-5 z-10 shadow-md">
       {playerList.map((player) => (
         <div
-          key={player.socketId || player.name}
+          key={
+            player.slot ? `slot-${player.slot}` : player.socketId || player.name
+          }
           className="flex-1 bg-white/40 rounded-lg"
         >
           {renderPlayerCard(player)}

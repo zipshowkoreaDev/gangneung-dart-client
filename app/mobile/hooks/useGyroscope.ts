@@ -248,7 +248,7 @@ export function useGyroscope({
           throwBlockedUntilRef.current = now + THROW_COOL_DOWN_MS;
 
           const hitResult = getHitResult(aimRef.current, currentRouletteRadius);
-          setMyScore((prev) => prev + hitResult.score);
+          setMyScore(hitResult.score);
 
           emitThrowDart({
             aim: aimRef.current,

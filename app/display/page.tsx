@@ -16,11 +16,14 @@ import DartCanvas from "./components/DartCanvas";
 
 const ROOM = process.env.NEXT_PUBLIC_ROOM ?? "zipshow";
 
+type FinishedPlayer = {
+  name: string;
+  score: number;
+};
+
 export default function DisplayPage() {
   const [isGameActive, setIsGameActive] = useState(false);
-  const [winner, setWinner] = useState<{ name: string; score: number } | null>(
-    null
-  );
+  const [winners, setWinners] = useState<FinishedPlayer[]>([]);
   const [endCountdown, setEndCountdown] = useState<number | null>(null);
   const {
     aimPositions,
@@ -52,11 +55,15 @@ export default function DisplayPage() {
 
     const handleGameFinished = (event: Event) => {
       const detail = (event as CustomEvent).detail as {
-        ranking?: Array<{ name: string; score: number }>;
+        ranking?: FinishedPlayer[];
       };
-      const topPlayer = detail.ranking?.[0];
-      if (topPlayer) {
-        setWinner({ name: topPlayer.name, score: topPlayer.score });
+      const topScore = detail.ranking?.[0]?.score;
+      if (typeof topScore === "number") {
+        setWinners(
+          detail.ranking?.filter((player) => player.score === topScore) ?? []
+        );
+      } else {
+        setWinners([]);
       }
       setIsGameActive(true);
       setEndCountdown(10);
@@ -75,7 +82,7 @@ export default function DisplayPage() {
     if (endCountdown <= 0) {
       const timer = window.setTimeout(() => {
         setIsGameActive(false);
-        setWinner(null);
+        setWinners([]);
         setEndCountdown(null);
         setPlayers(new Map());
         setPlayerOrder([]);
@@ -104,16 +111,23 @@ export default function DisplayPage() {
         />
         <DartCanvas />
         <RankingBoard rankings={rankings} />
-        {winner && (
+        {winners.length > 0 && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 text-white text-center px-8">
             <div className="text-lg tracking-[0.3em] text-white/60 mb-4">
-              WINNER
+              {winners.length > 1 ? "WINNERS" : "WINNER"}
             </div>
-            <div className="text-6xl font-bold text-[#FFD700] mb-4">
-              {winner.name}
+            <div className="mb-4 flex max-w-full flex-col items-center gap-3">
+              {winners.map((winner, index) => (
+                <div
+                  key={`${winner.name}-${winner.score}-${index}`}
+                  className="max-w-full truncate text-6xl font-bold text-[#FFD700]"
+                >
+                  {winner.name}
+                </div>
+              ))}
             </div>
             <div className="text-3xl font-semibold mb-10">
-              {winner.score}점
+              {winners[0]?.score}점
             </div>
             {typeof endCountdown === "number" && (
               <div>

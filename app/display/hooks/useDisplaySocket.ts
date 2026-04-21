@@ -63,6 +63,10 @@ function resolvePlayerKey(data: {
   return data.socketId || data.playerId || data.name || "player";
 }
 
+function getSlotPlayerKey(slot?: PlayerSlot) {
+  return slot ? `slot-${slot}` : undefined;
+}
+
 function stripDisplayName(name: string) {
   const [base] = name.split("#");
   return base || name;
@@ -92,8 +96,8 @@ export function useDisplaySocket({
   const gameFinishedEmittedRef = useRef(false);
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
 
-  // React state 비동기 반영 경쟁 조건 방지: 점수를 ref로 동기 추적
-  const playerScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
+  // React state 비동기 반영 경쟁 조건 방지: 마지막 점수를 ref로 동기 추적
+  const playerLastScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
 
   useEffect(() => {
     playersRef.current = players;
@@ -127,6 +131,16 @@ export function useDisplaySocket({
     const playerRoomSet = new Set(playerRooms);
     const isPlayerRoomEvent = (roomName?: string) =>
       !roomName || playerRoomSet.has(roomName);
+    const getRoomSlot = (roomName?: string): PlayerSlot | undefined => {
+      const slotIndex = roomName ? playerRooms.indexOf(roomName) : -1;
+      return slotIndex >= 0 ? ((slotIndex + 1) as PlayerSlot) : undefined;
+    };
+    const resolveDisplayPlayerKey = (data: {
+      room?: string;
+      playerId?: string;
+      name?: string;
+      socketId?: string;
+    }) => getSlotPlayerKey(getRoomSlot(data.room)) ?? resolvePlayerKey(data);
 
     const logPlayerCount = (
       label: string,
@@ -179,7 +193,7 @@ export function useDisplaySocket({
     }) => {
       if (!isPlayerRoomEvent(data.room)) return;
 
-      const key = resolvePlayerKey(data);
+      const key = resolveDisplayPlayerKey(data);
       if (!playersRef.current.has(key)) {
         onLog?.(`Ignored dart from unknown player ${key}`);
         return;
@@ -206,10 +220,10 @@ export function useDisplaySocket({
       if (player) {
         const newCurrentThrows = player.currentThrows + 1;
         const isLastThrow = newCurrentThrows >= 3;
-        const newScore = player.score + score;
+        const newScore = score;
 
         // React 상태 반영 전 onAimOff가 먼저 실행되는 경쟁 조건 방지
-        playerScoresRef.current.set(key, { name: player.name, score: newScore });
+        playerLastScoresRef.current.set(key, { name: player.name, score: newScore });
 
         nextPlayers.set(key, {
           ...player,
@@ -225,7 +239,9 @@ export function useDisplaySocket({
       }
 
       window.dispatchEvent(
-        new CustomEvent("DART_THROW", { detail: { ...data, score } })
+        new CustomEvent("DART_THROW", {
+          detail: { ...data, playerId: key, score },
+        })
       );
     };
 
@@ -240,13 +256,11 @@ export function useDisplaySocket({
     }) => {
       if (!isPlayerRoomEvent(data.room)) return;
 
-      const key = resolvePlayerKey(data);
+      const key = resolveDisplayPlayerKey(data);
       const x = clamp(data.aim?.x ?? 0, -1, 1);
       const y = clamp(data.aim?.y ?? 0, -1, 1);
       const displayName = data.name ? stripDisplayName(data.name) : key;
-      const slotIndex = data.room ? playerRooms.indexOf(data.room) : -1;
-      const slot =
-        slotIndex >= 0 ? ((slotIndex + 1) as PlayerSlot) : undefined;
+      const slot = getRoomSlot(data.room);
       const isRegistration = data.registration === true;
 
       if (key && key !== "_display") {
@@ -275,6 +289,7 @@ export function useDisplaySocket({
               serverName: data.name ?? existing.serverName,
               name: displayName ?? existing.name,
             });
+            playersRef.current = next;
             return next;
           }
 
@@ -291,6 +306,7 @@ export function useDisplaySocket({
               currentThrows: 0,
             });
             addedPlayer = true;
+            playersRef.current = next;
             return next;
           }
 
@@ -322,7 +338,7 @@ export function useDisplaySocket({
     }) => {
       if (!isPlayerRoomEvent(data.room)) return;
 
-      const key = resolvePlayerKey(data);
+      const key = resolveDisplayPlayerKey(data);
       setAimPositions((prev) => {
         const next = new Map(prev);
         next.delete(key);
@@ -336,11 +352,11 @@ export function useDisplaySocket({
         }
 
         // throw-dart와 aim-off가 같은 JS 태스크에서 처리될 경우 playersRef가 stale할 수 있으므로
-        // 동기적으로 누적한 playerScoresRef 값을 우선 사용
-        const tracked = playerScoresRef.current.get(key);
+        // 동기적으로 추적한 마지막 점수를 우선 사용
+        const tracked = playerLastScoresRef.current.get(key);
         const basePlayer = playersRef.current.get(key);
         const finishedScore = tracked?.score ?? basePlayer?.score ?? 0;
-        playerScoresRef.current.delete(key);
+        playerLastScoresRef.current.delete(key);
         finishedPlayerKeysRef.current.add(key);
         const nextPlayers = new Map(playersRef.current);
         const player = nextPlayers.get(key);
@@ -454,14 +470,14 @@ export function useDisplaySocket({
     };
 
     const onResetQueue = () => {
-      playerScoresRef.current.clear();
+      playerLastScoresRef.current.clear();
       finishedPlayerKeysRef.current.clear();
       gameFinishedEmittedRef.current = false;
       window.dispatchEvent(new CustomEvent("RESET_SCENE"));
     };
 
     const onResetScene = () => {
-      playerScoresRef.current.clear();
+      playerLastScoresRef.current.clear();
       finishedPlayerKeysRef.current.clear();
       gameFinishedEmittedRef.current = false;
     };
