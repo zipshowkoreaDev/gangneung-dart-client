@@ -32,6 +32,9 @@ export function useMobileSocket({
   // enabled가 true로 바뀔 때(재입장 포함)에도 slotRef를 동기화
   useEffect(() => {
     slotRef.current = slot;
+    if (enabled && slot) {
+      throwCountRef.current = 0;
+    }
   }, [slot, enabled]);
 
   // enabled && slot이 있을 때 joinRoom

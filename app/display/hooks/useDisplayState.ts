@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PlayerScore } from "@/app/display/components/Scoreboard";
+import type { PlayerScore } from "@/app/display/types";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
 

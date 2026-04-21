@@ -1,15 +1,4 @@
-import type { PlayerSlot } from "@/lib/room";
-
-type PlayerScore = {
-  socketId?: string;
-  slot?: PlayerSlot;
-  name: string;
-  score: number;
-  isConnected: boolean;
-  isReady: boolean;
-  totalThrows: number;
-  currentThrows: number;
-};
+import type { PlayerScore } from "@/app/display/types";
 
 type ScoreboardProps = {
   players: Map<string, PlayerScore>;
@@ -28,8 +17,11 @@ export default function Scoreboard({
 
   const renderPlayerCard = (player: PlayerScore) => {
     const hasPlayed = player.totalThrows >= 3;
+    const hasScore = !player.isWaiting && player.totalThrows > 0;
     const remainingThrows = Math.max(0, 3 - player.totalThrows);
-    const statusText = hasPlayed
+    const statusText = player.isWaiting
+      ? "입장 대기 중"
+      : hasPlayed
       ? "플레이 완료"
       : `남은 기회: ${remainingThrows}`;
 
@@ -37,7 +29,9 @@ export default function Scoreboard({
       <div
         className="flex-1 flex flex-col items-center justify-center gap-2 p-5 rounded-lg transition-all"
         style={{
-          background: player?.isReady
+          background: player.isWaiting
+            ? "rgba(255, 255, 255, 0.12)"
+            : player?.isReady
             ? "rgba(255, 255, 255, 0.08)"
             : "rgba(255, 255, 255, 0.05)",
           opacity: 1,
@@ -49,7 +43,7 @@ export default function Scoreboard({
           </span>
         </div>
         <div className="text-[2rem] font-bold text-[#FFD700]">
-          {hasPlayed ? `${player.score} 점` : ""}
+          {hasScore ? `${player.score} 점` : ""}
         </div>
         <div className="text-[0.75rem] opacity-70">{statusText}</div>
       </div>
@@ -71,5 +65,3 @@ export default function Scoreboard({
     </div>
   );
 }
-
-export type { PlayerScore };

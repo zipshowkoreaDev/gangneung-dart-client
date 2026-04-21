@@ -8,25 +8,15 @@ import {
 
 export default function useRankings() {
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
-  const lastFinishSignatureRef = useRef("");
+  const savedGameIdsRef = useRef<Set<string>>(new Set());
 
   const handlePlayersFinish = useCallback(
-    (players: Array<{ name: string; score: number }>) => {
-      const latestByName = new Map<string, { name: string; score: number }>();
-      players.forEach((player) => {
-        latestByName.set(player.name, player);
-      });
-
-      const entries = Array.from(latestByName.values());
-      const signature = entries
-        .map((player) => `${player.name}:${player.score}`)
-        .sort()
-        .join("|");
-
-      if (!signature || signature === lastFinishSignatureRef.current) return;
-
-      lastFinishSignatureRef.current = signature;
-      setRankings(addRankings(entries));
+    (players: Array<{ name: string; score: number }>, gameId?: string) => {
+      if (gameId) {
+        if (savedGameIdsRef.current.has(gameId)) return;
+        savedGameIdsRef.current.add(gameId);
+      }
+      setRankings(addRankings(players));
     },
     []
   );
