@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getRankings,
-  replaceRankings,
+  addRankings,
   getMillisecondsUntilRankingReset,
   RankingEntry,
 } from "@/lib/ranking";
@@ -19,7 +19,7 @@ export default function useRankings() {
         if (savedGameIdsRef.current.has(gameId)) return;
         savedGameIdsRef.current.add(gameId);
       }
-      setRankings(replaceRankings(entries));
+      setRankings(addRankings(entries));
     },
     []
   );

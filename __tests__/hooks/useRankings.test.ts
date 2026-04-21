@@ -138,7 +138,7 @@ describe("hooks/useRankings", () => {
       ).toHaveLength(1);
     });
 
-    it("새 게임 결과는 이전 TOP 10을 교체", () => {
+    it("새 게임 결과는 이전 TOP 10과 통합해서 정렬", () => {
       addRanking("이전게임", 999);
       const { result } = renderHook(() => useRankings());
 
@@ -153,15 +153,13 @@ describe("hooks/useRankings", () => {
         );
       });
 
-      expect(result.current.rankings).toHaveLength(3);
+      expect(result.current.rankings).toHaveLength(4);
       expect(result.current.rankings.map((entry) => entry.name)).toEqual([
+        "이전게임",
         "플레이어3",
         "플레이어2",
         "플레이어1",
       ]);
-      expect(
-        result.current.rankings.find((entry) => entry.name === "이전게임")
-      ).toBeUndefined();
     });
   });
 
