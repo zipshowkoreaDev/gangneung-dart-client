@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import useRankings from "@/app/display/hooks/useRankings";
 import { clearRankings, addRanking } from "@/lib/ranking";
 
@@ -19,14 +19,16 @@ describe("hooks/useRankings", () => {
       expect(result.current.rankings).toEqual([]);
     });
 
-    it("기존 랭킹 데이터 로드", () => {
+    it("기존 랭킹 데이터 로드", async () => {
       // 미리 데이터 추가
       addRanking("홍길동", 100);
       addRanking("김철수", 80);
 
       const { result } = renderHook(() => useRankings());
 
-      expect(result.current.rankings).toHaveLength(2);
+      await waitFor(() => {
+        expect(result.current.rankings).toHaveLength(2);
+      });
       expect(result.current.rankings[0].name).toBe("홍길동");
       expect(result.current.rankings[0].score).toBe(100);
     });
@@ -124,7 +126,7 @@ describe("hooks/useRankings", () => {
   });
 
   describe("localStorage 연동", () => {
-    it("handlePlayerFinish 후 localStorage에 저장", () => {
+    it("handlePlayerFinish 후 localStorage에 저장", async () => {
       const { result } = renderHook(() => useRankings());
 
       act(() => {
@@ -134,7 +136,9 @@ describe("hooks/useRankings", () => {
       // 새 Hook 인스턴스에서 데이터 확인
       const { result: result2 } = renderHook(() => useRankings());
 
-      expect(result2.current.rankings).toHaveLength(1);
+      await waitFor(() => {
+        expect(result2.current.rankings).toHaveLength(1);
+      });
       expect(result2.current.rankings[0].name).toBe("홍길동");
     });
 

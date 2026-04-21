@@ -1,6 +1,3 @@
-"use client";
-
-import { MAX_PLAYERS } from "@/lib/room";
 import type { PlayerSlot } from "@/lib/room";
 
 type PlayerScore = {
@@ -21,18 +18,18 @@ type ScoreboardProps = {
 export default function Scoreboard({
   players,
 }: ScoreboardProps) {
-  const playerList = Array.from(players.values());
-  const slots = Array.from({ length: MAX_PLAYERS }, (_, index) => {
-    const slot = (index + 1) as PlayerSlot;
-    return playerList.find((player) => player.slot === slot);
-  });
+  const playerList = Array.from(players.values()).sort(
+    (a, b) =>
+      (a.slot ?? Number.MAX_SAFE_INTEGER) -
+      (b.slot ?? Number.MAX_SAFE_INTEGER)
+  );
 
-  const renderPlayerCard = (player: PlayerScore | undefined, index: number) => {
-    const hasPlayed = player ? player.totalThrows >= 3 : false;
-    const remainingThrows = player ? Math.max(0, 3 - player.totalThrows) : 0;
-    const statusText = !player
-      ? "대기 중"
-      : hasPlayed
+  if (playerList.length === 0) return null;
+
+  const renderPlayerCard = (player: PlayerScore) => {
+    const hasPlayed = player.totalThrows >= 3;
+    const remainingThrows = Math.max(0, 3 - player.totalThrows);
+    const statusText = hasPlayed
       ? "플레이 완료"
       : `남은 기회: ${remainingThrows}`;
 
@@ -43,16 +40,16 @@ export default function Scoreboard({
           background: player?.isReady
             ? "rgba(255, 255, 255, 0.08)"
             : "rgba(255, 255, 255, 0.05)",
-          opacity: player ? 1 : 0.45,
+          opacity: 1,
         }}
       >
         <div className="flex items-center gap-2">
           <span className="text-[1.5rem] font-bold">
-            {player?.name ?? `PLAYER ${index + 1}`}
+            {player.name}
           </span>
         </div>
         <div className="text-[2rem] font-bold text-[#FFD700]">
-          {player && hasPlayed ? `${player.score} 점` : ""}
+          {hasPlayed ? `${player.score} 점` : ""}
         </div>
         <div className="text-[0.75rem] opacity-70">{statusText}</div>
       </div>
@@ -61,12 +58,12 @@ export default function Scoreboard({
 
   return (
     <div className="absolute top-0 left-0 w-full bg-white/20 backdrop-blur-md flex gap-5 p-5 z-10 shadow-md">
-      {slots.map((player, index) => (
+      {playerList.map((player) => (
         <div
-          key={player?.socketId || player?.name || `slot-${index}`}
+          key={player.socketId || player.name}
           className="flex-1 bg-white/40 rounded-lg"
         >
-          {renderPlayerCard(player, index)}
+          {renderPlayerCard(player)}
         </div>
       ))}
     </div>

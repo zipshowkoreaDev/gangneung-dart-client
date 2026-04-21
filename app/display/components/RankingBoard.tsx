@@ -8,7 +8,7 @@ interface RankingBoardProps {
 
 export default function RankingBoard({ rankings }: RankingBoardProps) {
   return (
-    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 shadow-md p-5 rounded-lg transition-all bg-white/20" >
+    <div className="absolute bottom-10 right-10 z-20 flex flex-col gap-2 shadow-md p-5 rounded-lg transition-all bg-white/20" >
       <div className="text-gray-800 text-sm font-bold text-center mb-1 opacity-80">
         TOP 5
       </div>

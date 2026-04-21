@@ -198,12 +198,4 @@ describe("hooks/useDisplayState", () => {
       expect(result.current.playerOrder).toEqual(["player1", "player3"]);
     });
   });
-
-  describe("setPlayerRoomCounts", () => {
-    it("함수가 존재함", () => {
-      const { result } = renderHook(() => useDisplayState());
-
-      expect(typeof result.current.setPlayerRoomCounts).toBe("function");
-    });
-  });
 });

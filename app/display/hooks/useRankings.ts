@@ -7,9 +7,7 @@ import {
 } from "@/lib/ranking";
 
 export default function useRankings() {
-  const [rankings, setRankings] = useState<RankingEntry[]>(() =>
-    getRankings()
-  );
+  const [rankings, setRankings] = useState<RankingEntry[]>([]);
 
   const handlePlayerFinish = useCallback((name: string, score: number) => {
     const updated = addRanking(name, score);
@@ -17,6 +15,9 @@ export default function useRankings() {
   }, []);
 
   useEffect(() => {
+    const loadTimerId = window.setTimeout(() => {
+      setRankings(getRankings());
+    }, 0);
     let timerId: number | undefined;
 
     const scheduleReset = () => {
@@ -29,6 +30,7 @@ export default function useRankings() {
     scheduleReset();
 
     return () => {
+      window.clearTimeout(loadTimerId);
       if (timerId !== undefined) {
         window.clearTimeout(timerId);
       }
