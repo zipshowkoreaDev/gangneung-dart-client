@@ -6,7 +6,7 @@ import { useDisplaySocket } from "./hooks/useDisplaySocket";
 import Scoreboard from "./components/Scoreboard";
 import AimOverlay from "./components/AimOverlay";
 import RankingBoard from "./components/RankingBoard";
-import TurnDelayOverlay from "./components/TurnDelayOverlay";
+import CountdownDisplay from "./components/CountdownDisplay";
 import useDisplayQrUrl from "./hooks/useDisplayQrUrl";
 import useRankings from "./hooks/useRankings";
 import useDisplayState from "./hooks/useDisplayState";
@@ -116,7 +116,7 @@ export default function DisplayPage() {
           players={players}
         />
         <DartCanvas />
-        <TurnDelayOverlay players={players} />
+        <CountdownDisplay players={players} />
         <RankingBoard rankings={rankings} />
         {winners.length > 0 && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 text-white text-center px-8">

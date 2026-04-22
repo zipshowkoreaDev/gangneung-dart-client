@@ -8,10 +8,11 @@ import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
 interface StuckDartProps {
   position: [number, number, number];
+  modelPath: string;
 }
 
-function StuckDart({ position }: StuckDartProps) {
-  const { scene } = useGLTF("/models/dart.glb");
+function StuckDart({ position, modelPath }: StuckDartProps) {
+  const { scene } = useGLTF(modelPath);
 
   return (
     <group position={position}>
@@ -26,12 +27,13 @@ function StuckDart({ position }: StuckDartProps) {
 
 interface FlyingDartProps {
   targetPosition: [number, number, number];
+  modelPath: string;
   onComplete: () => void;
 }
 
-function FlyingDart({ targetPosition, onComplete }: FlyingDartProps) {
+function FlyingDart({ targetPosition, modelPath, onComplete }: FlyingDartProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const { scene } = useGLTF("/models/dart.glb");
+  const { scene } = useGLTF(modelPath);
   const [progress, setProgress] = useState(0);
 
   const startPosition: [number, number, number] = [
@@ -86,15 +88,23 @@ interface ThrownDart {
   id: string;
   position: [number, number, number];
   ownerKey: string;
+  modelPath: string;
 }
 
 interface FlyingDartData {
   id: string;
   position: [number, number, number];
   ownerKey: string;
+  modelPath: string;
 }
 
 let cachedRouletteRadius = 20;
+
+function getDartModelPath(ownerKey: string) {
+  const slotMatch = ownerKey.match(/^slot-([1-4])$/);
+  const modelNumber = slotMatch?.[1] ?? "1";
+  return `/models/dart${modelNumber}.glb`;
+}
 
 function Roulette({
   flyingDarts,
@@ -120,12 +130,17 @@ function Roulette({
         <FlyingDart
           key={dart.id}
           targetPosition={dart.position}
+          modelPath={dart.modelPath}
           onComplete={() => {}}
         />
       ))}
 
       {stuckDarts.map((dart) => (
-        <StuckDart key={dart.id} position={dart.position} />
+        <StuckDart
+          key={dart.id}
+          position={dart.position}
+          modelPath={dart.modelPath}
+        />
       ))}
     </group>
   );
@@ -207,17 +222,18 @@ export default function Scene() {
     ownerKey: string
   ) => {
     const dartId = `${Date.now()}-${Math.random()}`;
+    const modelPath = getDartModelPath(ownerKey);
 
     setFlyingDarts((prev) => [
       ...prev,
-      { id: dartId, position, ownerKey },
+      { id: dartId, position, ownerKey, modelPath },
     ]);
 
     setTimeout(() => {
       setFlyingDarts((prev) => prev.filter((d) => d.id !== dartId));
       setStuckDarts((prev) => [
         ...prev,
-        { id: dartId, position, ownerKey },
+        { id: dartId, position, ownerKey, modelPath },
       ]);
     }, 700);
   };
@@ -237,4 +253,7 @@ export default function Scene() {
 }
 
 useGLTF.preload("/models/roulette.glb");
-useGLTF.preload("/models/dart.glb");
+useGLTF.preload("/models/dart1.glb");
+useGLTF.preload("/models/dart2.glb");
+useGLTF.preload("/models/dart3.glb");
+useGLTF.preload("/models/dart4.glb");
