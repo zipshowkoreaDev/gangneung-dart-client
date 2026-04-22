@@ -6,11 +6,11 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
-const DART_MODEL_SCALE = 1.2;
+const DART_MODEL_SCALE = 24;
 const DART_MODEL_ROTATION: [number, number, number] = [
-  Math.PI / 8,
+  Math.PI / 2,
   0,
-  -Math.PI / 2,
+  0,
 ];
 const DART_MODEL_PATHS = [
   "/models/dart_blue.glb",
