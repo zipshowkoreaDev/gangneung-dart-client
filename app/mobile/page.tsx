@@ -92,6 +92,7 @@ export default function MobilePage() {
     isWaitingForApproval: hasApprovalWait,
     isHost,
     canStartGame,
+    hostApprovalTimeLeft,
     joinedQueueRef,
     connectAndJoinQueue,
     leaveQueue,
@@ -279,7 +280,7 @@ export default function MobilePage() {
           title={isHost ? "참가자 대기 중" : "게임 시작 대기 중"}
           message={
             isHost
-              ? "참가자가 준비되면 게임을 시작하세요."
+              ? `게임 시작까지 ${hostApprovalTimeLeft ?? 30}초`
               : "1번 참가자가 게임을 시작할 때까지 기다려주세요."
           }
           actionLabel={isHost ? "게임 시작" : undefined}

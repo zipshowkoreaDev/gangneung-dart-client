@@ -65,7 +65,7 @@ export default function DisplayPage() {
       const topScore = detail.ranking?.[0]?.score;
       if (typeof topScore === "number") {
         setWinners(
-          detail.ranking?.filter((player) => player.score === topScore) ?? []
+          detail.ranking?.filter((player) => player.score === topScore) ?? [],
         );
       } else {
         setWinners([]);
@@ -100,7 +100,7 @@ export default function DisplayPage() {
 
     const timer = window.setTimeout(
       () => setEndCountdown((prev) => (prev === null ? null : prev - 1)),
-      1000
+      1000,
     );
     return () => window.clearTimeout(timer);
   }, [endCountdown, setAimPositions, setPlayerOrder, setPlayers]);

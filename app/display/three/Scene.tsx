@@ -7,6 +7,11 @@ import * as THREE from "three";
 import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
 const DART_MODEL_SCALE = 1.2;
+const DART_MODEL_ROTATION: [number, number, number] = [
+  Math.PI / 8,
+  0,
+  -Math.PI / 2,
+];
 
 interface StuckDartProps {
   position: [number, number, number];
@@ -20,7 +25,7 @@ function StuckDart({ position, modelPath }: StuckDartProps) {
     <group position={position}>
       <primitive
         object={scene.clone()}
-        rotation={[0, 0, -Math.PI / 2]}
+        rotation={DART_MODEL_ROTATION}
         scale={DART_MODEL_SCALE}
       />
     </group>
@@ -33,7 +38,11 @@ interface FlyingDartProps {
   onComplete: () => void;
 }
 
-function FlyingDart({ targetPosition, modelPath, onComplete }: FlyingDartProps) {
+function FlyingDart({
+  targetPosition,
+  modelPath,
+  onComplete,
+}: FlyingDartProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF(modelPath);
   const [progress, setProgress] = useState(0);
@@ -59,27 +68,25 @@ function FlyingDart({ targetPosition, modelPath, onComplete }: FlyingDartProps) 
     groupRef.current.position.x = THREE.MathUtils.lerp(
       startPosition[0],
       targetPosition[0],
-      progress
+      progress,
     );
     groupRef.current.position.y = THREE.MathUtils.lerp(
       startPosition[1],
       targetPosition[1],
-      progress
+      progress,
     );
     groupRef.current.position.z = THREE.MathUtils.lerp(
       startPosition[2],
       targetPosition[2],
-      progress
+      progress,
     );
-
-    groupRef.current.rotation.y += delta * 3;
   });
 
   return (
     <group ref={groupRef}>
       <primitive
         object={scene.clone()}
-        rotation={[0, 0, -Math.PI / 2]}
+        rotation={DART_MODEL_ROTATION}
         scale={DART_MODEL_SCALE}
       />
     </group>
@@ -176,11 +183,10 @@ function DartEventHandler({
       const intersectPoint = new THREE.Vector3();
       raycaster.ray.intersectPlane(plane, intersectPoint);
 
-      const ownerKey =
-        data.playerId || data.name || data.socketId || "player";
+      const ownerKey = data.playerId || data.name || data.socketId || "player";
       onDartThrow(
         [intersectPoint.x, intersectPoint.y, intersectPoint.z],
-        ownerKey
+        ownerKey,
       );
     };
 
@@ -221,7 +227,7 @@ export default function Scene() {
 
   const handleDartThrow = (
     position: [number, number, number],
-    ownerKey: string
+    ownerKey: string,
   ) => {
     const dartId = `${Date.now()}-${Math.random()}`;
     const modelPath = getDartModelPath(ownerKey);
@@ -245,8 +251,16 @@ export default function Scene() {
       <DartEventHandler onDartThrow={handleDartThrow} />
 
       <ambientLight intensity={1.5} color={"white"} />
-      <directionalLight position={[-20, 0, 20]} intensity={1.5} color="#ffffff" />
-      <directionalLight position={[20, 0, 20]} intensity={1.5} color="#ffffff" />
+      <directionalLight
+        position={[-20, 0, 20]}
+        intensity={1.5}
+        color="#ffffff"
+      />
+      <directionalLight
+        position={[20, 0, 20]}
+        intensity={1.5}
+        color="#ffffff"
+      />
       <directionalLight position={[0, 20, 15]} intensity={1.5} />
 
       <Roulette flyingDarts={flyingDarts} stuckDarts={stuckDarts} />
@@ -255,7 +269,7 @@ export default function Scene() {
 }
 
 useGLTF.preload("/models/roulette.glb");
-useGLTF.preload("/models/dart1.glb");
-useGLTF.preload("/models/dart2.glb");
-useGLTF.preload("/models/dart3.glb");
-useGLTF.preload("/models/dart4.glb");
+useGLTF.preload("/models/dart_blue.glb");
+useGLTF.preload("/models/dart_red.glb");
+useGLTF.preload("/models/dart_green.glb");
+useGLTF.preload("/models/dart_yellow.glb");

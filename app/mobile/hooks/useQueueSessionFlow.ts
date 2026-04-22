@@ -20,6 +20,7 @@ type UseQueueSessionFlowReturn = {
   isWaitingForApproval: boolean;
   isHost: boolean;
   canStartGame: boolean;
+  hostApprovalTimeLeft: number | null;
   joinedQueueRef: React.MutableRefObject<boolean>;
   connectAndJoinQueue: () => void;
   leaveQueue: () => void;
@@ -53,6 +54,7 @@ export default function useQueueSessionFlow({
     isWaitingForApproval,
     isHost,
     canStartGame,
+    hostApprovalTimeLeft,
     joinedQueueRef,
     leaveQueue,
     connectAndJoinQueue,
@@ -71,6 +73,7 @@ export default function useQueueSessionFlow({
     isWaitingForApproval,
     isHost,
     canStartGame,
+    hostApprovalTimeLeft,
     joinedQueueRef,
     connectAndJoinQueue,
     leaveQueue,

@@ -11,6 +11,7 @@ import {
 import { debugLog } from "@/app/mobile/debugLog";
 
 const QUEUE_TIMEOUT_MS = 2 * 60 * 1000;
+const HOST_APPROVAL_TIMEOUT_MS = 30 * 1000;
 const GAME_STARTED_EVENT = "game-started";
 const START_GAME_EVENT = "start-game";
 
@@ -28,6 +29,7 @@ interface UseQueueReturn {
   isWaitingForApproval: boolean;
   isHost: boolean;
   canStartGame: boolean;
+  hostApprovalTimeLeft: number | null;
   joinedQueueRef: React.MutableRefObject<boolean>;
   leaveQueue: () => void;
   connectAndJoinQueue: () => void;
@@ -47,17 +49,23 @@ export function useQueue({
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [canStartGame, setCanStartGame] = useState(false);
+  const [hostApprovalTimeLeft, setHostApprovalTimeLeft] = useState<number | null>(
+    null,
+  );
   const joinedQueueRef = useRef(false);
   const lastRejoinAtRef = useRef(0);
   const queueStartAtRef = useRef<number | null>(null);
   const lastJoinedSocketIdRef = useRef<string | null>(null);
   const startRequestedRef = useRef(false);
   const queueSnapshotRef = useRef<string[]>([]);
+  const hostApprovalDeadlineRef = useRef<number | null>(null);
 
   const clearApprovalWait = useCallback(() => {
     setIsWaitingForApproval(false);
     setIsHost(false);
     setCanStartGame(false);
+    setHostApprovalTimeLeft(null);
+    hostApprovalDeadlineRef.current = null;
   }, []);
 
   const leaveQueue = useCallback(() => {
@@ -72,7 +80,9 @@ export function useQueue({
     queueSnapshotRef.current = [];
     setIsHost(false);
     setCanStartGame(false);
+    setHostApprovalTimeLeft(null);
     queueStartAtRef.current = null;
+    hostApprovalDeadlineRef.current = null;
     startRequestedRef.current = false;
     clearApprovalWait();
   }, [clearApprovalWait]);
@@ -177,6 +187,21 @@ export function useQueue({
         setIsHost(host);
         setCanStartGame(host && !startRequestedRef.current);
         setIsWaitingForApproval(true);
+        if (host && !startRequestedRef.current) {
+          hostApprovalDeadlineRef.current ??=
+            Date.now() + HOST_APPROVAL_TIMEOUT_MS;
+          setHostApprovalTimeLeft(
+            Math.max(
+              0,
+              Math.ceil(
+                (hostApprovalDeadlineRef.current - Date.now()) / 1000,
+              ),
+            ),
+          );
+        } else {
+          hostApprovalDeadlineRef.current = null;
+          setHostApprovalTimeLeft(null);
+        }
 
         if (host && startRequestedRef.current) {
           startGameWithPlayers(uniqueQueue.slice(0, MAX_PLAYERS));
@@ -262,6 +287,21 @@ export function useQueue({
       }
     }, 5000);
 
+    const hostApprovalTimerId = window.setInterval(() => {
+      const deadline = hostApprovalDeadlineRef.current;
+      if (!deadline || !joinedQueueRef.current || startRequestedRef.current) {
+        return;
+      }
+
+      const timeLeft = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setHostApprovalTimeLeft(timeLeft);
+
+      if (timeLeft <= 0) {
+        debugLog("[Queue] host approval timeout - leave queue");
+        leaveQueue();
+      }
+    }, 250);
+
     if (socket.connected) {
       onConnect();
     }
@@ -269,6 +309,7 @@ export function useQueue({
     return () => {
       window.clearInterval(heartbeatId);
       window.clearInterval(timeoutId);
+      window.clearInterval(hostApprovalTimerId);
       clearApprovalWait();
       socket.off("connect", onConnect);
       socket.off("connect_error", onConnectError);
@@ -284,6 +325,8 @@ export function useQueue({
 
     startRequestedRef.current = true;
     setCanStartGame(false);
+    setHostApprovalTimeLeft(null);
+    hostApprovalDeadlineRef.current = null;
     socket.emit("status-queue");
   }, [isHost]);
 
@@ -294,6 +337,7 @@ export function useQueue({
     isWaitingForApproval,
     isHost,
     canStartGame,
+    hostApprovalTimeLeft,
     joinedQueueRef,
     leaveQueue,
     connectAndJoinQueue,
