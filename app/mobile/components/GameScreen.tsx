@@ -18,13 +18,13 @@ export default function GameScreen({
   onCalibrate,
 }: GameScreenProps) {
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center">
-      <div className="absolute top-5 left-1/2 -translate-x-1/2 text-white text-lg font-bold text-center">
+    <div className="flex min-h-full w-full flex-col items-center justify-center py-4">
+      <div className="shrink-0 text-center text-lg font-bold text-white">
         <div>다트 게임</div>
       </div>
 
       {/* 자이로 조준 패드 */}
-      <div className="w-[90%] max-w-[500px] h-[60vh] bg-white/10 rounded-3xl border-[3px] border-white/30 relative backdrop-blur-[10px]">
+      <div className="relative mt-4 h-[min(52dvh,440px)] min-h-[220px] w-[90%] max-w-[500px] shrink rounded-3xl border-[3px] border-white/30 bg-white/10 backdrop-blur-[10px]">
         <div
           className="absolute top-1/2 left-1/2 w-[60px] h-[60px] rounded-full border-4 border-[#FFD700] bg-[#FFD700]/30 pointer-events-none transition-transform duration-[50ms] ease-out"
           style={{
@@ -36,10 +36,10 @@ export default function GameScreen({
         </div>
       </div>
 
-      <div className="mt-5 text-white text-xs opacity-60">
+      <div className="mt-4 shrink-0 text-xs text-white opacity-60">
         X: {aimPosition.x.toFixed(2)}, Y: {aimPosition.y.toFixed(2)}
       </div>
-      <div className="mt-2 text-white text-sm opacity-80 tracking-[6px]">
+      <div className="mt-2 shrink-0 text-sm tracking-[6px] text-white opacity-80">
         {Array.from({ length: 3 }).map((_, index) => (
           <span
             key={index}
@@ -51,7 +51,7 @@ export default function GameScreen({
       </div>
       <div
         className={[
-          "mt-3 rounded-full px-4 py-2 text-sm font-bold",
+          "mt-3 shrink-0 rounded-full px-4 py-2 text-sm font-bold",
           dartTimeLeft <= 3
             ? "bg-[#ff3b30]/25 text-[#ffdddd]"
             : "bg-white/15 text-white",
@@ -62,7 +62,7 @@ export default function GameScreen({
 
       <button
         onClick={onCalibrate}
-        className="mt-4 px-5 py-3 text-sm font-semibold rounded-full border-none bg-white/20 text-white cursor-pointer"
+        className="mt-4 shrink-0 cursor-pointer rounded-full border-none bg-white/20 px-5 py-3 text-sm font-semibold text-white"
       >
         조준 영점 조절
       </button>
@@ -70,7 +70,7 @@ export default function GameScreen({
       {!sensorsReady && (
         <button
           onClick={onRequestPermission}
-          className="mt-3 px-5 py-3 text-sm font-semibold rounded-full border-none bg-white/20 text-white cursor-pointer"
+          className="mt-3 shrink-0 cursor-pointer rounded-full border-none bg-white/20 px-5 py-3 text-sm font-semibold text-white"
         >
           자이로 권한 다시 요청
         </button>

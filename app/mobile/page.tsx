@@ -23,7 +23,7 @@ import QueueLoading from "./components/QueueLoading";
 
 export default function MobilePage() {
   const [sessionValid] = useState<boolean | null>(() =>
-    getQRSession() !== null ? true : false
+    getQRSession() !== null ? true : false,
   );
   const [room] = useState(getRoomFromUrl);
   const {
@@ -40,11 +40,11 @@ export default function MobilePage() {
   const [startError, setStartError] = useState("");
   const [gamePlayers, setGamePlayers] = useState<string[]>([]);
   const [finishedPlayers, setFinishedPlayers] = useState<Set<string>>(
-    () => new Set()
+    () => new Set(),
   );
   const [endCountdown, setEndCountdown] = useState<number | null>(null);
   const [canJoinCurrentGame, setCanJoinCurrentGame] = useState<boolean | null>(
-    null
+    null,
   );
 
   const handlePlayerFinished = useCallback((playerId: string) => {
@@ -56,19 +56,14 @@ export default function MobilePage() {
     });
   }, []);
 
-  const {
-    emitAimUpdate,
-    emitAimOff,
-    emitThrowDart,
-    leaveGame,
-    socketId,
-  } = useMobileSocket({
-    room,
-    name: socketName,
-    enabled: hasJoined,
-    slot: assignedSlot,
-    onPlayerFinished: handlePlayerFinished,
-  });
+  const { emitAimUpdate, emitAimOff, emitThrowDart, leaveGame, socketId } =
+    useMobileSocket({
+      room,
+      name: socketName,
+      enabled: hasJoined,
+      slot: assignedSlot,
+      onPlayerFinished: handlePlayerFinished,
+    });
 
   const {
     aimPosition,
@@ -160,28 +155,26 @@ export default function MobilePage() {
     stopSensors,
   });
 
-  const {
-    handleStart,
-    handleExit,
-    handleRequestPermission,
-  } = useStartExitFlow({
-    errorMessage,
-    setStartError,
-    requestMotionPermission,
-    connectAndJoinQueue,
-    resetName,
-    leaveQueue,
-    leaveGame,
-    stopSensors,
-    setHasFinishedTurn,
-    setIsInGame,
-    setHasJoined,
-    startSensors,
-  });
+  const { handleStart, handleExit, handleRequestPermission } = useStartExitFlow(
+    {
+      errorMessage,
+      setStartError,
+      requestMotionPermission,
+      connectAndJoinQueue,
+      resetName,
+      leaveQueue,
+      leaveGame,
+      stopSensors,
+      setHasFinishedTurn,
+      setIsInGame,
+      setHasJoined,
+      startSensors,
+    },
+  );
 
   const myPlayerIndex = useMemo(
     () => (socketId ? gamePlayers.indexOf(socketId) : -1),
-    [gamePlayers, socketId]
+    [gamePlayers, socketId],
   );
   const myTurn =
     isInGame &&
@@ -199,7 +192,7 @@ export default function MobilePage() {
     if (!socketId || !hasFinishedTurn) return;
     const timerId = window.setTimeout(
       () => handlePlayerFinished(socketId),
-      TURN_RESULT_DELAY_MS
+      TURN_RESULT_DELAY_MS,
     );
     return () => window.clearTimeout(timerId);
   }, [socketId, hasFinishedTurn, handlePlayerFinished]);
@@ -228,7 +221,7 @@ export default function MobilePage() {
     }
     const timer = window.setTimeout(
       () => setEndCountdown((prev) => (prev === null ? null : prev - 1)),
-      1000
+      1000,
     );
     return () => window.clearTimeout(timer);
   }, [endCountdown, handleExit]);
@@ -238,11 +231,14 @@ export default function MobilePage() {
       if (startError) setStartError("");
       setCustomName(value);
     },
-    [setCustomName, startError]
+    [setCustomName, startError],
   );
 
   const isWaitingInQueue =
-    isInQueue && !isInGame && queuePosition !== null && queuePosition >= MAX_PLAYERS;
+    isInQueue &&
+    !isInGame &&
+    queuePosition !== null &&
+    queuePosition >= MAX_PLAYERS;
   const isWaitingForApproval =
     isInQueue &&
     !isInGame &&
@@ -263,7 +259,7 @@ export default function MobilePage() {
     !isInGame &&
     canJoinCurrentGame === null;
   return (
-    <div className="h-screen flex flex-col items-center justify-center gap-8 bg-gradient-to-br from-[#1e3c72] to-[#2a5298] px-5">
+    <div className="flex h-[100dvh] min-h-[100dvh] flex-col items-center justify-center gap-8 overflow-y-auto bg-gradient-to-br from-[#1e3c72] to-[#2a5298] px-5 py-[max(20px,env(safe-area-inset-top))] pb-[max(20px,env(safe-area-inset-bottom))]">
       {sessionValid === null && <SessionValidating />}
       {sessionValid === false && <AccessDenied />}
 
@@ -346,17 +342,18 @@ export default function MobilePage() {
         !hasFinishedTurn &&
         !isInGame &&
         canJoinCurrentGame === true && (
-        <NameInput
-          name={customName}
-          onNameChange={handleNameChange}
-          onStart={handleStart}
-          errorMessage={errorMessage || startError}
-        />
-      )}
+          <NameInput
+            name={customName}
+            onNameChange={handleNameChange}
+            onStart={handleStart}
+            errorMessage={errorMessage || startError}
+          />
+        )}
 
-      {sessionValid === true && isInQueue && !isInGame && queuePosition === null && (
-        <QueueLoading />
-      )}
+      {sessionValid === true &&
+        isInQueue &&
+        !isInGame &&
+        queuePosition === null && <QueueLoading />}
     </div>
   );
 }
