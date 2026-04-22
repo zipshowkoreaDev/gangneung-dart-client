@@ -19,7 +19,7 @@ import {
   DEFAULT_ROULETTE_RADIUS,
 } from "@/lib/score";
 import { isAimInsideDisplayBounds } from "@/lib/displayAimBounds";
-import { TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
+import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import type { PlayerScore } from "@/app/display/types";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
@@ -292,6 +292,7 @@ export function useDisplaySocket({
             totalThrows: 0,
             currentThrows: 0,
             throwScores: [],
+            dartDeadlineEndsAt: undefined,
           });
         });
 
@@ -346,6 +347,9 @@ export function useDisplaySocket({
         const turnDelayEndsAt = isLastThrow
           ? Date.now() + TURN_RESULT_DELAY_MS
           : undefined;
+        const dartDeadlineEndsAt = isLastThrow
+          ? undefined
+          : Date.now() + DART_TIME_LIMIT_MS;
 
         // React 상태 반영 전 onAimOff가 먼저 실행되는 경쟁 조건 방지
         playerLastScoresRef.current.set(key, { name: player.name, score: newScore });
@@ -356,6 +360,7 @@ export function useDisplaySocket({
           totalThrows: player.totalThrows + 1,
           currentThrows: isLastThrow ? 0 : newCurrentThrows,
           throwScores,
+          dartDeadlineEndsAt,
           turnDelayEndsAt,
         });
         playersRef.current = nextPlayers;
@@ -423,6 +428,7 @@ export function useDisplaySocket({
                 totalThrows: 0,
                 currentThrows: 0,
                 throwScores: [],
+                dartDeadlineEndsAt: undefined,
                 turnDelayEndsAt: undefined,
                 isWaiting: false,
               });
@@ -434,6 +440,7 @@ export function useDisplaySocket({
               shouldUpdateAim = false;
               return prev;
             }
+            const isBecomingReady = !existing.isReady && existing.totalThrows < 3;
             next.set(key, {
               ...existing,
               slot: slot ?? existing.slot,
@@ -443,6 +450,9 @@ export function useDisplaySocket({
               serverName: data.name ?? existing.serverName,
               name: displayName ?? existing.name,
               isWaiting: false,
+              dartDeadlineEndsAt: isBecomingReady
+                ? Date.now() + DART_TIME_LIMIT_MS
+                : existing.dartDeadlineEndsAt,
             });
             playersRef.current = next;
             return next;
@@ -461,6 +471,9 @@ export function useDisplaySocket({
               totalThrows: 0,
               currentThrows: 0,
               throwScores: [],
+              dartDeadlineEndsAt: isRegistration
+                ? undefined
+                : Date.now() + DART_TIME_LIMIT_MS,
               turnDelayEndsAt: undefined,
             });
             addedPlayer = true;
@@ -527,6 +540,7 @@ export function useDisplaySocket({
               isConnected: false,
               isReady: false,
               currentThrows: 0,
+              dartDeadlineEndsAt: undefined,
             });
           }
           playersRef.current = nextPlayers;
@@ -544,6 +558,7 @@ export function useDisplaySocket({
             isReady: false,
             totalThrows: reportedThrows,
             currentThrows: 0,
+            dartDeadlineEndsAt: undefined,
           });
           onLog?.(`Aim off: ${key}`);
         }

@@ -161,16 +161,6 @@ export function useMobileSocket({
       });
 
       throwCountRef.current += 1;
-
-      if (throwCountRef.current >= 3) {
-        socket.emit("aim-off", {
-          room: playerRoom,
-          socketId: socket.id,
-          name,
-          totalThrows: throwCountRef.current,
-        });
-        throwCountRef.current = 3;
-      }
     },
     [room, name]
   );

@@ -10,22 +10,28 @@ function getTurnDelaySeconds(player: PlayerScore, now: number) {
   return Math.max(0, Math.ceil((player.turnDelayEndsAt - now) / 1000));
 }
 
+function getDartTimeLeft(player: PlayerScore, now: number) {
+  if (!player.dartDeadlineEndsAt) return 0;
+  return Math.max(0, Math.ceil((player.dartDeadlineEndsAt - now) / 1000));
+}
+
 export default function Scoreboard({ players }: ScoreboardProps) {
   const [now, setNow] = useState(() => Date.now());
   const playerList = Array.from(players.values()).sort(
     (a, b) =>
       (a.slot ?? Number.MAX_SAFE_INTEGER) - (b.slot ?? Number.MAX_SAFE_INTEGER),
   );
-  const hasActiveTurnDelay = playerList.some(
-    (player) => getTurnDelaySeconds(player, now) > 0
+  const hasActiveCountdown = playerList.some(
+    (player) =>
+      getTurnDelaySeconds(player, now) > 0 || getDartTimeLeft(player, now) > 0
   );
 
   useEffect(() => {
-    if (!hasActiveTurnDelay) return;
+    if (!hasActiveCountdown) return;
 
     const timerId = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timerId);
-  }, [hasActiveTurnDelay]);
+  }, [hasActiveCountdown]);
 
   if (playerList.length === 0) return null;
 
@@ -52,16 +58,21 @@ export default function Scoreboard({ players }: ScoreboardProps) {
     const hasScore = !player.isWaiting && player.totalThrows > 0;
     const remainingThrows = Math.max(0, 3 - player.totalThrows);
     const turnDelaySeconds = getTurnDelaySeconds(player, now);
+    const dartTimeLeft = getDartTimeLeft(player, now);
     const statusText = player.isWaiting
       ? "입장 대기 중"
       : turnDelaySeconds > 0
         ? `다음 차례까지 ${turnDelaySeconds}초`
+      : dartTimeLeft > 0 && !hasPlayed
+        ? `남은 기회: ${remainingThrows} · ${dartTimeLeft}초`
       : hasPlayed
         ? "플레이 완료"
         : `남은 기회: ${remainingThrows}`;
     const statusClassName =
       turnDelaySeconds > 0
         ? "rounded-full bg-[#FFD700]/20 px-3 py-1 text-[0.85rem] font-bold text-[#FFD700]"
+      : dartTimeLeft > 0 && dartTimeLeft <= 3
+        ? "rounded-full bg-[#ff3b30]/20 px-3 py-1 text-[0.85rem] font-bold text-[#ffdddd]"
         : "text-[0.75rem] opacity-70";
 
     return (

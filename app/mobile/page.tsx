@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useMobileSocket } from "./hooks/useMobileSocket";
 import { useGyroscope } from "./hooks/useGyroscope";
 import { getQRSession } from "@/lib/session";
@@ -46,32 +46,15 @@ export default function MobilePage() {
   const [canJoinCurrentGame, setCanJoinCurrentGame] = useState<boolean | null>(
     null
   );
-  const pendingFinishedTimersRef = useRef<Map<string, number>>(new Map());
 
   const handlePlayerFinished = useCallback((playerId: string) => {
-    if (pendingFinishedTimersRef.current.has(playerId)) return;
-
-    const timerId = window.setTimeout(() => {
-      pendingFinishedTimersRef.current.delete(playerId);
-      setFinishedPlayers((prev) => {
-        if (prev.has(playerId)) return prev;
-        const next = new Set(prev);
-        next.add(playerId);
-        return next;
-      });
-    }, TURN_RESULT_DELAY_MS);
-
-    pendingFinishedTimersRef.current.set(playerId, timerId);
-  }, []);
-
-  const clearPendingFinishedTimers = useCallback(() => {
-    pendingFinishedTimersRef.current.forEach((timerId) => {
-      window.clearTimeout(timerId);
+    setFinishedPlayers((prev) => {
+      if (prev.has(playerId)) return prev;
+      const next = new Set(prev);
+      next.add(playerId);
+      return next;
     });
-    pendingFinishedTimersRef.current.clear();
   }, []);
-
-  useEffect(() => clearPendingFinishedTimers, [clearPendingFinishedTimers]);
 
   const {
     emitAimUpdate,
@@ -92,6 +75,7 @@ export default function MobilePage() {
     sensorsReady,
     sensorError,
     throwsLeft,
+    dartTimeLeft,
     hasFinishedTurn,
     totalScore,
     startSensors,
@@ -213,7 +197,11 @@ export default function MobilePage() {
 
   useEffect(() => {
     if (!socketId || !hasFinishedTurn) return;
-    handlePlayerFinished(socketId);
+    const timerId = window.setTimeout(
+      () => handlePlayerFinished(socketId),
+      TURN_RESULT_DELAY_MS
+    );
+    return () => window.clearTimeout(timerId);
   }, [socketId, hasFinishedTurn, handlePlayerFinished]);
 
   useEffect(() => {
@@ -232,7 +220,6 @@ export default function MobilePage() {
     if (endCountdown <= 0) {
       const timer = window.setTimeout(() => {
         handleExit();
-        clearPendingFinishedTimers();
         setGamePlayers([]);
         setFinishedPlayers(new Set());
         setEndCountdown(null);
@@ -244,7 +231,7 @@ export default function MobilePage() {
       1000
     );
     return () => window.clearTimeout(timer);
-  }, [clearPendingFinishedTimers, endCountdown, handleExit]);
+  }, [endCountdown, handleExit]);
 
   const handleNameChange = useCallback(
     (value: string) => {
@@ -325,6 +312,7 @@ export default function MobilePage() {
         <GameScreen
           aimPosition={aimPosition}
           throwsLeft={throwsLeft}
+          dartTimeLeft={dartTimeLeft}
           sensorsReady={sensorsReady}
           sensorError={sensorError}
           onRequestPermission={handleRequestPermission}

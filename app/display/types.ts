@@ -12,5 +12,6 @@ export type PlayerScore = {
   totalThrows: number;
   currentThrows: number;
   throwScores: number[];
+  dartDeadlineEndsAt?: number;
   turnDelayEndsAt?: number;
 };

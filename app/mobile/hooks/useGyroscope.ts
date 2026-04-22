@@ -1,14 +1,16 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   DEFAULT_ROULETTE_RADIUS,
   getScoreFromZone,
   getZoneFromAim,
   type Zone,
 } from "@/lib/score";
+import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 
 const AIM_HZ = 30;
 const AIM_INTERVAL = 1000 / AIM_HZ;
 const THROW_COOL_DOWN_MS = 700;
+const OUT_OF_BOUNDS_AIM = { x: 2, y: 2 };
 
 // 조준 각도 범위
 const GAMMA_RANGE = 40; // X축 ±40도
@@ -75,6 +77,9 @@ export function useGyroscope({
   const [throwsLeft, setThrowsLeft] = useState(3);
   const [hasFinishedTurn, setHasFinishedTurn] = useState(false);
   const [totalScore, setTotalScore] = useState(0);
+  const [dartTimeLeft, setDartTimeLeft] = useState(
+    DART_TIME_LIMIT_MS / 1000
+  );
 
   const sensorsActiveRef = useRef(false);
   const lastAimSentRef = useRef(0);
@@ -82,6 +87,9 @@ export function useGyroscope({
   const aimRef = useRef({ x: 0, y: 0 });
   const throwCountRef = useRef(0);
   const throwBlockedUntilRef = useRef(0);
+  const dartTimerIdRef = useRef<number | null>(null);
+  const turnFinishTimerIdRef = useRef<number | null>(null);
+  const startDartTimerRef = useRef<() => void>(() => {});
 
   const neutralBetaRef = useRef(DEFAULT_NEUTRAL_BETA);
   const neutralGammaRef = useRef(DEFAULT_NEUTRAL_GAMMA);
@@ -92,6 +100,105 @@ export function useGyroscope({
 
   const handleOrientationRef = useRef<((e: DeviceOrientationEvent) => void) | null>(null);
   const handleMotionRef = useRef<((e: DeviceMotionEvent) => void) | null>(null);
+
+  const clearDartTimer = useCallback(() => {
+    if (dartTimerIdRef.current === null) return;
+    window.clearInterval(dartTimerIdRef.current);
+    dartTimerIdRef.current = null;
+  }, []);
+
+  const clearTurnFinishTimer = useCallback(() => {
+    if (turnFinishTimerIdRef.current === null) return;
+    window.clearTimeout(turnFinishTimerIdRef.current);
+    turnFinishTimerIdRef.current = null;
+  }, []);
+
+  const stopSensors = useCallback(() => {
+    if (!sensorsActiveRef.current) return;
+
+    sensorsActiveRef.current = false;
+    setSensorsReady(false);
+    setThrowsLeft(0);
+    clearDartTimer();
+    clearTurnFinishTimer();
+    throwCountRef.current = 0;
+    isTrackingRef.current = false;
+    peakMagRef.current = 0;
+
+    if (handleOrientationRef.current) {
+      window.removeEventListener("deviceorientation", handleOrientationRef.current);
+      handleOrientationRef.current = null;
+    }
+    if (handleMotionRef.current) {
+      window.removeEventListener("devicemotion", handleMotionRef.current);
+      handleMotionRef.current = null;
+    }
+
+    emitAimOff();
+  }, [clearDartTimer, clearTurnFinishTimer, emitAimOff]);
+
+  const finishTurn = useCallback(() => {
+    setHasFinishedTurn(true);
+    clearDartTimer();
+
+    if (handleMotionRef.current) {
+      window.removeEventListener("devicemotion", handleMotionRef.current);
+      handleMotionRef.current = null;
+    }
+
+    clearTurnFinishTimer();
+    turnFinishTimerIdRef.current = window.setTimeout(() => {
+      turnFinishTimerIdRef.current = null;
+      stopSensors();
+    }, TURN_RESULT_DELAY_MS);
+  }, [clearDartTimer, clearTurnFinishTimer, stopSensors]);
+
+  const completeThrow = useCallback(
+    (hitResult: HitResult, aim: { x: number; y: number }) => {
+      if (!sensorsActiveRef.current || throwCountRef.current >= 3) return;
+
+      setTotalScore((prev) => prev + hitResult.score);
+      emitThrowDart({
+        aim,
+        zone: hitResult.zone,
+      });
+
+      throwCountRef.current += 1;
+      setThrowsLeft((prev) => Math.max(0, prev - 1));
+      setDartTimeLeft(DART_TIME_LIMIT_MS / 1000);
+      peakMagRef.current = 0;
+
+      if (throwCountRef.current >= 3) {
+        finishTurn();
+        return;
+      }
+
+      startDartTimerRef.current();
+    },
+    [emitThrowDart, finishTurn]
+  );
+
+  const startDartTimer = useCallback(() => {
+    clearDartTimer();
+    setDartTimeLeft(DART_TIME_LIMIT_MS / 1000);
+
+    const startedAt = Date.now();
+    dartTimerIdRef.current = window.setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const remainingMs = Math.max(0, DART_TIME_LIMIT_MS - elapsed);
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      setDartTimeLeft(remainingSeconds);
+
+      if (remainingMs > 0) return;
+
+      clearDartTimer();
+      completeThrow({ zone: "miss", score: 0 }, OUT_OF_BOUNDS_AIM);
+    }, 250);
+  }, [clearDartTimer, completeThrow]);
+
+  useEffect(() => {
+    startDartTimerRef.current = startDartTimer;
+  }, [startDartTimer]);
 
   const requestMotionPermission = async (): Promise<boolean> => {
     try {
@@ -135,28 +242,6 @@ export function useGyroscope({
     if ("vibrate" in navigator) navigator.vibrate(100);
   }, []);
 
-  const stopSensors = useCallback(() => {
-    if (!sensorsActiveRef.current) return;
-
-    sensorsActiveRef.current = false;
-    setSensorsReady(false);
-    setThrowsLeft(0);
-    throwCountRef.current = 0;
-    isTrackingRef.current = false;
-    peakMagRef.current = 0;
-
-    if (handleOrientationRef.current) {
-      window.removeEventListener("deviceorientation", handleOrientationRef.current);
-      handleOrientationRef.current = null;
-    }
-    if (handleMotionRef.current) {
-      window.removeEventListener("devicemotion", handleMotionRef.current);
-      handleMotionRef.current = null;
-    }
-
-    emitAimOff();
-  }, [emitAimOff]);
-
   const startSensors = useCallback(() => {
     if (sensorsActiveRef.current) return;
 
@@ -165,10 +250,12 @@ export function useGyroscope({
     setHasFinishedTurn(false);
     setThrowsLeft(3);
     setTotalScore(0);
+    setDartTimeLeft(DART_TIME_LIMIT_MS / 1000);
     throwCountRef.current = 0;
     throwBlockedUntilRef.current = 0;
     isTrackingRef.current = false;
     peakMagRef.current = 0;
+    clearTurnFinishTimer();
 
     handleOrientationRef.current = (e: DeviceOrientationEvent) => {
       const beta = e.beta ?? DEFAULT_NEUTRAL_BETA;
@@ -224,44 +311,34 @@ export function useGyroscope({
           throwBlockedUntilRef.current = now + THROW_COOL_DOWN_MS;
 
           const hitResult = getHitResult(aimRef.current, currentRouletteRadius);
-          setTotalScore((prev) => prev + hitResult.score);
-
-          emitThrowDart({
-            aim: aimRef.current,
-            zone: hitResult.zone,
-          });
+          clearDartTimer();
+          completeThrow(hitResult, aimRef.current);
 
           if ("vibrate" in navigator) navigator.vibrate(50);
-
-          throwCountRef.current += 1;
-          setThrowsLeft((prev) => Math.max(0, prev - 1));
-          peakMagRef.current = 0;
-
-          if (throwCountRef.current >= 3) {
-            setHasFinishedTurn(true);
-
-            // motion 리스너 즉시 제거 — 유령 던짐 방지
-            if (handleMotionRef.current) {
-              window.removeEventListener("devicemotion", handleMotionRef.current);
-              handleMotionRef.current = null;
-            }
-
-            // orientation 리스너는 3초 후 제거 (디스플레이 애니메이션 대기)
-            setTimeout(() => stopSensors(), 3000);
-          }
         }
       }
     };
 
+    startDartTimer();
+    emitAimUpdate(aimRef.current);
+
     window.addEventListener("deviceorientation", handleOrientationRef.current);
     window.addEventListener("devicemotion", handleMotionRef.current);
-  }, [stopSensors, emitAimUpdate, emitThrowDart, currentRouletteRadius]);
+  }, [
+    clearDartTimer,
+    clearTurnFinishTimer,
+    completeThrow,
+    emitAimUpdate,
+    currentRouletteRadius,
+    startDartTimer,
+  ]);
 
   return {
     aimPosition,
     sensorsReady,
     sensorError,
     throwsLeft,
+    dartTimeLeft,
     hasFinishedTurn,
     totalScore,
     startSensors,

@@ -1,6 +1,7 @@
 interface GameScreenProps {
   aimPosition: { x: number; y: number };
   throwsLeft: number;
+  dartTimeLeft: number;
   sensorsReady: boolean;
   sensorError: string;
   onRequestPermission: () => void;
@@ -10,6 +11,7 @@ interface GameScreenProps {
 export default function GameScreen({
   aimPosition,
   throwsLeft,
+  dartTimeLeft,
   sensorsReady,
   sensorError,
   onRequestPermission,
@@ -46,6 +48,16 @@ export default function GameScreen({
             O
           </span>
         ))}
+      </div>
+      <div
+        className={[
+          "mt-3 rounded-full px-4 py-2 text-sm font-bold",
+          dartTimeLeft <= 3
+            ? "bg-[#ff3b30]/25 text-[#ffdddd]"
+            : "bg-white/15 text-white",
+        ].join(" ")}
+      >
+        남은 시간 {dartTimeLeft}초
       </div>
 
       <button
