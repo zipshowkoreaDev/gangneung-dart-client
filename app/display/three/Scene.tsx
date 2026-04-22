@@ -6,6 +6,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
+const DART_MODEL_SCALE = 1.2;
+
 interface StuckDartProps {
   position: [number, number, number];
   modelPath: string;
@@ -19,7 +21,7 @@ function StuckDart({ position, modelPath }: StuckDartProps) {
       <primitive
         object={scene.clone()}
         rotation={[0, 0, -Math.PI / 2]}
-        scale={0.4}
+        scale={DART_MODEL_SCALE}
       />
     </group>
   );
@@ -78,7 +80,7 @@ function FlyingDart({ targetPosition, modelPath, onComplete }: FlyingDartProps) 
       <primitive
         object={scene.clone()}
         rotation={[0, 0, -Math.PI / 2]}
-        scale={0.4}
+        scale={DART_MODEL_SCALE}
       />
     </group>
   );
