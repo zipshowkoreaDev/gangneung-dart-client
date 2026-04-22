@@ -1,14 +1,31 @@
+import { useEffect, useState } from "react";
 import type { PlayerScore } from "@/app/display/types";
 
 type ScoreboardProps = {
   players: Map<string, PlayerScore>;
 };
 
+function getTurnDelaySeconds(player: PlayerScore, now: number) {
+  if (!player.turnDelayEndsAt) return 0;
+  return Math.max(0, Math.ceil((player.turnDelayEndsAt - now) / 1000));
+}
+
 export default function Scoreboard({ players }: ScoreboardProps) {
+  const [now, setNow] = useState(() => Date.now());
   const playerList = Array.from(players.values()).sort(
     (a, b) =>
       (a.slot ?? Number.MAX_SAFE_INTEGER) - (b.slot ?? Number.MAX_SAFE_INTEGER),
   );
+  const hasActiveTurnDelay = playerList.some(
+    (player) => getTurnDelaySeconds(player, now) > 0
+  );
+
+  useEffect(() => {
+    if (!hasActiveTurnDelay) return;
+
+    const timerId = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timerId);
+  }, [hasActiveTurnDelay]);
 
   if (playerList.length === 0) return null;
 
@@ -34,11 +51,18 @@ export default function Scoreboard({ players }: ScoreboardProps) {
     const hasPlayed = player.totalThrows >= 3;
     const hasScore = !player.isWaiting && player.totalThrows > 0;
     const remainingThrows = Math.max(0, 3 - player.totalThrows);
+    const turnDelaySeconds = getTurnDelaySeconds(player, now);
     const statusText = player.isWaiting
       ? "입장 대기 중"
+      : turnDelaySeconds > 0
+        ? `다음 차례까지 ${turnDelaySeconds}초`
       : hasPlayed
         ? "플레이 완료"
         : `남은 기회: ${remainingThrows}`;
+    const statusClassName =
+      turnDelaySeconds > 0
+        ? "rounded-full bg-[#FFD700]/20 px-3 py-1 text-[0.85rem] font-bold text-[#FFD700]"
+        : "text-[0.75rem] opacity-70";
 
     return (
       <div
@@ -61,7 +85,7 @@ export default function Scoreboard({ players }: ScoreboardProps) {
         <div className="text-[2rem] font-bold text-[#FFD700]">
           {hasScore ? `${player.score} 점` : ""}
         </div>
-        <div className="text-[0.75rem] opacity-70">{statusText}</div>
+        <div className={statusClassName}>{statusText}</div>
       </div>
     );
   };

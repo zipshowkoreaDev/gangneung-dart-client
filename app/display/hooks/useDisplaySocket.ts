@@ -19,6 +19,7 @@ import {
   DEFAULT_ROULETTE_RADIUS,
 } from "@/lib/score";
 import { isAimInsideDisplayBounds } from "@/lib/displayAimBounds";
+import { TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import type { PlayerScore } from "@/app/display/types";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
@@ -146,7 +147,6 @@ export function useDisplaySocket({
   );
 
   const QUEUE_STATUS_INTERVAL_MS = 1000;
-  const CLEAR_DARTS_DELAY_MS = 3000;
 
   useEffect(() => {
     if (!room) return;
@@ -343,6 +343,9 @@ export function useDisplaySocket({
         const isLastThrow = newCurrentThrows >= 3;
         const newScore = player.score + score;
         const throwScores = [...(player.throwScores ?? []), score].slice(0, 3);
+        const turnDelayEndsAt = isLastThrow
+          ? Date.now() + TURN_RESULT_DELAY_MS
+          : undefined;
 
         // React 상태 반영 전 onAimOff가 먼저 실행되는 경쟁 조건 방지
         playerLastScoresRef.current.set(key, { name: player.name, score: newScore });
@@ -353,6 +356,7 @@ export function useDisplaySocket({
           totalThrows: player.totalThrows + 1,
           currentThrows: isLastThrow ? 0 : newCurrentThrows,
           throwScores,
+          turnDelayEndsAt,
         });
         playersRef.current = nextPlayers;
         setPlayers(nextPlayers);
@@ -419,6 +423,7 @@ export function useDisplaySocket({
                 totalThrows: 0,
                 currentThrows: 0,
                 throwScores: [],
+                turnDelayEndsAt: undefined,
                 isWaiting: false,
               });
               playersRef.current = next;
@@ -456,6 +461,7 @@ export function useDisplaySocket({
               totalThrows: 0,
               currentThrows: 0,
               throwScores: [],
+              turnDelayEndsAt: undefined,
             });
             addedPlayer = true;
             playersRef.current = next;
@@ -554,7 +560,7 @@ export function useDisplaySocket({
           window.dispatchEvent(
             new CustomEvent("CLEAR_PLAYER_DARTS", { detail: { key } })
           );
-        }, CLEAR_DARTS_DELAY_MS);
+        }, TURN_RESULT_DELAY_MS);
 
         if (
           data.room &&

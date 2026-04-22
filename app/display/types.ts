@@ -12,4 +12,5 @@ export type PlayerScore = {
   totalThrows: number;
   currentThrows: number;
   throwScores: number[];
+  turnDelayEndsAt?: number;
 };

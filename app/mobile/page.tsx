@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useMobileSocket } from "./hooks/useMobileSocket";
 import { useGyroscope } from "./hooks/useGyroscope";
 import { getQRSession } from "@/lib/session";
@@ -12,6 +12,7 @@ import useGameLifecycle from "./hooks/useGameLifecycle";
 import useRadiusParam from "./hooks/useRadiusParam";
 import useQueueSessionFlow from "./hooks/useQueueSessionFlow";
 import useStartExitFlow from "./hooks/useStartExitFlow";
+import { TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import SessionValidating from "./components/SessionValidating";
 import AccessDenied from "./components/AccessDenied";
 import NameInput from "./components/NameInput";
@@ -19,6 +20,7 @@ import GameScreen from "./components/GameScreen";
 import ResultScreen from "./components/ResultScreen";
 import WaitingScreen from "./components/WaitingScreen";
 import QueueLoading from "./components/QueueLoading";
+
 export default function MobilePage() {
   const [sessionValid] = useState<boolean | null>(() =>
     getQRSession() !== null ? true : false
@@ -44,15 +46,32 @@ export default function MobilePage() {
   const [canJoinCurrentGame, setCanJoinCurrentGame] = useState<boolean | null>(
     null
   );
+  const pendingFinishedTimersRef = useRef<Map<string, number>>(new Map());
 
   const handlePlayerFinished = useCallback((playerId: string) => {
-    setFinishedPlayers((prev) => {
-      if (prev.has(playerId)) return prev;
-      const next = new Set(prev);
-      next.add(playerId);
-      return next;
-    });
+    if (pendingFinishedTimersRef.current.has(playerId)) return;
+
+    const timerId = window.setTimeout(() => {
+      pendingFinishedTimersRef.current.delete(playerId);
+      setFinishedPlayers((prev) => {
+        if (prev.has(playerId)) return prev;
+        const next = new Set(prev);
+        next.add(playerId);
+        return next;
+      });
+    }, TURN_RESULT_DELAY_MS);
+
+    pendingFinishedTimersRef.current.set(playerId, timerId);
   }, []);
+
+  const clearPendingFinishedTimers = useCallback(() => {
+    pendingFinishedTimersRef.current.forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    pendingFinishedTimersRef.current.clear();
+  }, []);
+
+  useEffect(() => clearPendingFinishedTimers, [clearPendingFinishedTimers]);
 
   const {
     emitAimUpdate,
@@ -194,8 +213,7 @@ export default function MobilePage() {
 
   useEffect(() => {
     if (!socketId || !hasFinishedTurn) return;
-    const timer = window.setTimeout(() => handlePlayerFinished(socketId), 0);
-    return () => window.clearTimeout(timer);
+    handlePlayerFinished(socketId);
   }, [socketId, hasFinishedTurn, handlePlayerFinished]);
 
   useEffect(() => {
@@ -214,6 +232,7 @@ export default function MobilePage() {
     if (endCountdown <= 0) {
       const timer = window.setTimeout(() => {
         handleExit();
+        clearPendingFinishedTimers();
         setGamePlayers([]);
         setFinishedPlayers(new Set());
         setEndCountdown(null);
@@ -225,7 +244,7 @@ export default function MobilePage() {
       1000
     );
     return () => window.clearTimeout(timer);
-  }, [endCountdown, handleExit]);
+  }, [clearPendingFinishedTimers, endCountdown, handleExit]);
 
   const handleNameChange = useCallback(
     (value: string) => {
