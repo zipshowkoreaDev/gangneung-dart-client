@@ -14,7 +14,7 @@ export default function AuthPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [status, setStatus] = useState<"validating" | "success" | "error">("validating");
+  const [status, setStatus] = useState<"validating" | "error">("validating");
 
   useEffect(() => {
     const validateAndRedirect = async () => {
@@ -27,10 +27,7 @@ export default function AuthPage() {
       }
 
       setQRSession(token);
-      setStatus("success");
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      router.push(`/mobile?room=${room}`);
+      router.replace(`/mobile?room=${room}`);
     };
 
     validateAndRedirect();
@@ -44,18 +41,6 @@ export default function AuthPage() {
             <>
               <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
               <div className="text-white text-xl font-semibold">QR 코드 인증 중...</div>
-            </>
-          )}
-
-          {status === "success" && (
-            <>
-              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="text-white text-xl font-semibold">인증 완료!</div>
-              <div className="text-white/70 text-sm">체험 페이지로 이동합니다...</div>
             </>
           )}
 

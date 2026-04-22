@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { getBaseUrl } from "@/lib/url";
 import { generateSessionToken } from "@/lib/session";
+import { socket } from "@/shared/socket";
 
 const FIXED_ROOM = "zipshow";
 
@@ -41,6 +42,21 @@ export default function AdminQRPage() {
     alert("클립보드에 복사되었습니다!");
   };
 
+  const resetQueue = () => {
+    const confirmed = window.confirm(
+      "현재 대기열과 진행 상태를 전체 초기화할까요?",
+    );
+    if (!confirmed) return;
+
+    if (!socket.connected) {
+      socket.io.opts.query = { room: FIXED_ROOM, name: "_admin" };
+      socket.connect();
+    }
+
+    socket.emit("reset-queue");
+    alert("전체 리셋 요청을 보냈습니다.");
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-8">
       <div className="max-w-7xl mx-auto">
@@ -56,12 +72,20 @@ export default function AdminQRPage() {
         {qrCode ? (
           <div className="space-y-6">
             <div className="flex justify-center mb-6">
-              <button
-                onClick={() => generateQRCodes()}
-                className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition-colors shadow-lg"
-              >
-                새 QR 코드 생성
-              </button>
+              <div className="flex flex-wrap justify-center gap-3">
+                <button
+                  onClick={() => generateQRCodes()}
+                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition-colors shadow-lg"
+                >
+                  새 QR 코드 생성
+                </button>
+                <button
+                  onClick={resetQueue}
+                  className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white text-lg font-semibold rounded-lg transition-colors shadow-lg"
+                >
+                  전체 리셋
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
