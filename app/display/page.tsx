@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDisplaySocket } from "./hooks/useDisplaySocket";
 import Scoreboard from "./components/Scoreboard";
 import AimOverlay from "./components/AimOverlay";
 import RankingBoard from "./components/RankingBoard";
+import TurnDelayOverlay from "./components/TurnDelayOverlay";
 import useDisplayQrUrl from "./hooks/useDisplayQrUrl";
 import useRankings from "./hooks/useRankings";
 import useDisplayState from "./hooks/useDisplayState";
@@ -25,6 +26,7 @@ export default function DisplayPage() {
   const [isGameActive, setIsGameActive] = useState(false);
   const [winners, setWinners] = useState<FinishedPlayer[]>([]);
   const [endCountdown, setEndCountdown] = useState<number | null>(null);
+  const isShowingGameFinishedRef = useRef(false);
   const {
     aimPositions,
     setAimPositions,
@@ -54,6 +56,9 @@ export default function DisplayPage() {
     };
 
     const handleGameFinished = (event: Event) => {
+      if (isShowingGameFinishedRef.current) return;
+      isShowingGameFinishedRef.current = true;
+
       const detail = (event as CustomEvent).detail as {
         ranking?: FinishedPlayer[];
       };
@@ -84,6 +89,7 @@ export default function DisplayPage() {
         setIsGameActive(false);
         setWinners([]);
         setEndCountdown(null);
+        isShowingGameFinishedRef.current = false;
         setPlayers(new Map());
         setPlayerOrder([]);
         setAimPositions(new Map());
@@ -110,6 +116,7 @@ export default function DisplayPage() {
           players={players}
         />
         <DartCanvas />
+        <TurnDelayOverlay players={players} />
         <RankingBoard rankings={rankings} />
         {winners.length > 0 && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 text-white text-center px-8">

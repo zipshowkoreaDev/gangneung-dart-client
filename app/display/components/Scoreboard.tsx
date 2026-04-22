@@ -1,19 +1,10 @@
 import { useEffect, useState } from "react";
 import type { PlayerScore } from "@/app/display/types";
+import { getDartTimeLeft, getTurnDelaySeconds } from "@/app/display/utils/countdown";
 
 type ScoreboardProps = {
   players: Map<string, PlayerScore>;
 };
-
-function getTurnDelaySeconds(player: PlayerScore, now: number) {
-  if (!player.turnDelayEndsAt) return 0;
-  return Math.max(0, Math.ceil((player.turnDelayEndsAt - now) / 1000));
-}
-
-function getDartTimeLeft(player: PlayerScore, now: number) {
-  if (!player.dartDeadlineEndsAt) return 0;
-  return Math.max(0, Math.ceil((player.dartDeadlineEndsAt - now) / 1000));
-}
 
 export default function Scoreboard({ players }: ScoreboardProps) {
   const [now, setNow] = useState(() => Date.now());
