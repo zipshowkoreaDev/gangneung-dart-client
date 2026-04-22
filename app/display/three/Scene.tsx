@@ -12,6 +12,12 @@ const DART_MODEL_ROTATION: [number, number, number] = [
   0,
   -Math.PI / 2,
 ];
+const DART_MODEL_PATHS = [
+  "/models/dart_blue.glb",
+  "/models/dart_red.glb",
+  "/models/dart_green.glb",
+  "/models/dart_yellow.glb",
+] as const;
 
 interface StuckDartProps {
   position: [number, number, number];
@@ -111,8 +117,8 @@ let cachedRouletteRadius = 20;
 
 function getDartModelPath(ownerKey: string) {
   const slotMatch = ownerKey.match(/^slot-([1-4])$/);
-  const modelNumber = slotMatch?.[1] ?? "1";
-  return `/models/dart${modelNumber}.glb`;
+  const slotIndex = slotMatch ? Number(slotMatch[1]) - 1 : 0;
+  return DART_MODEL_PATHS[slotIndex] ?? DART_MODEL_PATHS[0];
 }
 
 function Roulette({
@@ -181,7 +187,8 @@ function DartEventHandler({
 
       const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -1);
       const intersectPoint = new THREE.Vector3();
-      raycaster.ray.intersectPlane(plane, intersectPoint);
+      const hasIntersection = raycaster.ray.intersectPlane(plane, intersectPoint);
+      if (!hasIntersection) return;
 
       const ownerKey = data.playerId || data.name || data.socketId || "player";
       onDartThrow(
@@ -269,7 +276,4 @@ export default function Scene() {
 }
 
 useGLTF.preload("/models/roulette.glb");
-useGLTF.preload("/models/dart_blue.glb");
-useGLTF.preload("/models/dart_red.glb");
-useGLTF.preload("/models/dart_green.glb");
-useGLTF.preload("/models/dart_yellow.glb");
+DART_MODEL_PATHS.forEach((path) => useGLTF.preload(path));
