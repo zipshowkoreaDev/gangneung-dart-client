@@ -163,6 +163,7 @@ export default function MobilePage() {
     isInQueue,
     queuePosition,
     queueSnapshot,
+    waitingPlayers,
     isWaitingForApproval: hasApprovalWait,
     isHost,
     canStartGame,
@@ -374,6 +375,49 @@ export default function MobilePage() {
     !hasFinishedTurn &&
     !isInGame &&
     canJoinCurrentGame === null;
+
+  const renderWaitingPlayers = () => {
+    if (waitingPlayers.length === 0) return null;
+
+    return (
+      <div className="mt-6 w-[min(82vw,320px)] rounded-xl border border-white/15 bg-white/10 p-4 text-left shadow-lg backdrop-blur-md">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm font-semibold text-white/80">참가자 대기 목록</span>
+          <span className="rounded-md bg-black/20 px-2 py-1 text-xs font-bold text-white/80 tabular-nums">
+            {waitingPlayers.length}/{MAX_PLAYERS}
+          </span>
+        </div>
+        <div className="flex flex-col gap-2">
+          {waitingPlayers.map((player, index) => {
+            const isMe = player.socketId === socketId;
+
+            return (
+              <div
+                key={player.socketId}
+                className={[
+                  "flex items-center gap-3 rounded-lg px-3 py-2",
+                  isMe ? "bg-[#FFD700]/20" : "bg-white/8",
+                ].join(" ")}
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/15 text-xs font-bold text-white">
+                  {player.slot ?? index + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+                  {player.name}
+                </span>
+                {isMe && (
+                  <span className="shrink-0 rounded-md bg-[#FFD700] px-2 py-1 text-[11px] font-bold text-black">
+                    나
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] flex-col items-center justify-center gap-8 overflow-y-auto bg-gradient-to-br from-[#1e3c72] to-[#2a5298] px-5 py-[max(20px,env(safe-area-inset-top))] pb-[max(20px,env(safe-area-inset-bottom))]">
       {sessionValid === null && <SessionValidating />}
@@ -401,7 +445,9 @@ export default function MobilePage() {
           actionLabel={isHost ? "게임 시작" : undefined}
           onAction={isHost ? startGame : undefined}
           actionDisabled={!canStartGame}
-        />
+        >
+          {renderWaitingPlayers()}
+        </QueueLoading>
       )}
 
       {sessionValid === true && hasFinishedTurn && !gameFinished && (

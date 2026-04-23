@@ -1,9 +1,12 @@
+import type { ReactNode } from "react";
+
 interface QueueLoadingProps {
   title?: string;
   message?: string;
   actionLabel?: string;
   onAction?: () => void;
   actionDisabled?: boolean;
+  children?: ReactNode;
 }
 
 export default function QueueLoading({
@@ -12,11 +15,13 @@ export default function QueueLoading({
   actionLabel,
   onAction,
   actionDisabled = false,
+  children,
 }: QueueLoadingProps) {
   return (
     <div className="text-white text-center">
       <div className="text-xl mb-2">{title}</div>
       {message && <div className="text-sm opacity-80">{message}</div>}
+      {children}
       {actionLabel && onAction && (
         <button
           type="button"

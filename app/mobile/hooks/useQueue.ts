@@ -8,6 +8,7 @@ import {
   type PlayerSlot,
 } from "@/lib/room";
 import { debugLog } from "@/app/mobile/debugLog";
+import { stripDisplayName } from "@/lib/displayName";
 
 const QUEUE_TIMEOUT_MS = 2 * 60 * 1000;
 const HOST_APPROVAL_TIMEOUT_MS = 30 * 1000;
@@ -22,10 +23,17 @@ interface UseQueueProps {
   onEnterGame: (slot: PlayerSlot, players: string[]) => void;
 }
 
+export type WaitingPlayer = {
+  socketId: string;
+  name: string;
+  slot: PlayerSlot | null;
+};
+
 interface UseQueueReturn {
   isInQueue: boolean;
   queuePosition: number | null;
   queueSnapshot: string[] | null;
+  waitingPlayers: WaitingPlayer[];
   isWaitingForApproval: boolean;
   isHost: boolean;
   canStartGame: boolean;
@@ -46,6 +54,9 @@ export function useQueue({
   const [isInQueue, setIsInQueue] = useState(false);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [queueSnapshot, setQueueSnapshot] = useState<string[] | null>(null);
+  const [queuedPlayerNames, setQueuedPlayerNames] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [canStartGame, setCanStartGame] = useState(false);
@@ -80,6 +91,7 @@ export function useQueue({
     setIsInQueue(false);
     setQueuePosition(null);
     setQueueSnapshot(null);
+    setQueuedPlayerNames(new Map());
     queueSnapshotRef.current = [];
     setIsHost(false);
     setCanStartGame(false);
@@ -205,6 +217,20 @@ export function useQueue({
       debugLog(`[Queue] status-queue: ${JSON.stringify(uniqueQueue)}`);
       setQueueSnapshot(uniqueQueue);
       queueSnapshotRef.current = uniqueQueue;
+      setQueuedPlayerNames((prev) => {
+        const next = new Map(prev);
+        const queuedSocketIdSet = new Set(uniqueQueue);
+        let changed = false;
+
+        Array.from(next.keys()).forEach((socketId) => {
+          if (!queuedSocketIdSet.has(socketId)) {
+            next.delete(socketId);
+            changed = true;
+          }
+        });
+
+        return changed ? next : prev;
+      });
 
       const position = findMyPosition(uniqueQueue);
       debugLog(`[Queue] 내 위치: ${position}`);
@@ -281,15 +307,26 @@ export function useQueue({
 
     const onAimUpdate = (data: {
       socketId?: string;
+      name?: string;
       registration?: boolean;
       queueRegistration?: boolean;
     }) => {
-      if (
-        data.queueRegistration ||
-        !data.registration ||
-        !data.socketId ||
-        data.socketId === socket.id
-      ) {
+      if (data.queueRegistration) {
+        if (!data.socketId || !data.name) return;
+        const { socketId, name: playerName } = data;
+
+        setQueuedPlayerNames((prev) => {
+          const displayName = stripDisplayName(playerName);
+          if (prev.get(socketId) === displayName) return prev;
+
+          const next = new Map(prev);
+          next.set(socketId, displayName);
+          return next;
+        });
+        return;
+      }
+
+      if (!data.registration || !data.socketId || data.socketId === socket.id) {
         return;
       }
 
@@ -408,6 +445,15 @@ export function useQueue({
     };
   }, [isInQueue, isInGame, name, onEnterGame, room, leaveQueue, clearApprovalWait]);
 
+  const waitingPlayers =
+    queueSnapshot?.slice(0, MAX_PLAYERS).map((socketId, index) => ({
+      socketId,
+      name:
+        queuedPlayerNames.get(socketId) ??
+        (socketId === socket.id && name ? stripDisplayName(name) : `참가자 ${index + 1}`),
+      slot: getSlotFromPosition(index),
+    })) ?? [];
+
   const startGame = useCallback(() => {
     if (!isHost || startRequestedRef.current) return;
 
@@ -422,6 +468,7 @@ export function useQueue({
     isInQueue,
     queuePosition,
     queueSnapshot,
+    waitingPlayers,
     isWaitingForApproval,
     isHost,
     canStartGame,

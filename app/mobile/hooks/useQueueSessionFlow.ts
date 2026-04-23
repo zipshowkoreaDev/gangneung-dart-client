@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useQueue } from "@/app/mobile/hooks/useQueue";
 import { debugLog } from "@/app/mobile/debugLog";
 import type { PlayerSlot } from "@/lib/room";
+import type { WaitingPlayer } from "@/app/mobile/hooks/useQueue";
 
 type UseQueueSessionFlowParams = {
   room: string;
@@ -17,6 +18,7 @@ type UseQueueSessionFlowReturn = {
   isInQueue: boolean;
   queuePosition: number | null;
   queueSnapshot: string[] | null;
+  waitingPlayers: WaitingPlayer[];
   isWaitingForApproval: boolean;
   isHost: boolean;
   canStartGame: boolean;
@@ -51,6 +53,7 @@ export default function useQueueSessionFlow({
     isInQueue,
     queuePosition,
     queueSnapshot,
+    waitingPlayers,
     isWaitingForApproval,
     isHost,
     canStartGame,
@@ -70,6 +73,7 @@ export default function useQueueSessionFlow({
     isInQueue,
     queuePosition,
     queueSnapshot,
+    waitingPlayers,
     isWaitingForApproval,
     isHost,
     canStartGame,
