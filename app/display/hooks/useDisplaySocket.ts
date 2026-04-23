@@ -320,6 +320,35 @@ export function useDisplaySocket({
       const uniqueQueue = Array.from(new Set(queue)).filter(Boolean);
       queuedPlayerIdsRef.current = uniqueQueue.slice(0, MAX_PLAYERS);
       onLog?.(`Queue players: ${uniqueQueue.length}`);
+
+      setPlayers((prev) => {
+        const next = new Map(prev);
+        const queuedSocketIdSet = new Set(uniqueQueue);
+        let changed = false;
+
+        Array.from(next.entries()).forEach(([key, player]) => {
+          if (!player.isWaiting || !player.socketId) return;
+
+          if (!queuedSocketIdSet.has(player.socketId)) {
+            next.delete(key);
+            changed = true;
+            return;
+          }
+
+          const slot = getQueuedSocketSlot(player.socketId);
+          if (slot && player.slot !== slot) {
+            next.set(key, { ...player, slot });
+            changed = true;
+          }
+        });
+
+        if (changed) {
+          playersRef.current = next;
+          return next;
+        }
+
+        return prev;
+      });
     };
 
     const onDartThrown = (data: {
@@ -425,6 +454,7 @@ export function useDisplaySocket({
       slot?: PlayerSlot;
       skin?: string;
       registration?: boolean;
+      queueRegistration?: boolean;
       aim: { x: number; y: number };
     }) => {
       if (!isRoomEvent(data.room)) return;
@@ -436,6 +466,49 @@ export function useDisplaySocket({
       const displayName = data.name ? stripDisplayName(data.name) : key;
       const slot = data.slot ?? getQueuedSocketSlot(data.socketId);
       const isRegistration = data.registration === true;
+      const isQueueRegistration = data.queueRegistration === true;
+
+      if (isQueueRegistration) {
+        const waitingKey = data.socketId ? getQueuePlayerKey(data.socketId) : key;
+        rememberPlayerAliases(waitingKey, data);
+
+        setPlayers((prev) => {
+          const next = new Map(prev);
+          const existingEntry = getExistingPlayerEntry(next, waitingKey, data);
+          const existingKey = existingEntry?.[0];
+          const existing = existingEntry?.[1];
+
+          if (existingKey && existingKey !== waitingKey) {
+            next.delete(existingKey);
+          }
+          removeDuplicateWaitingPlayers(next, waitingKey, data.socketId);
+
+          next.set(waitingKey, {
+            socketId: data.socketId,
+            serverName: data.name,
+            slot: slot ?? existing?.slot,
+            name: displayName,
+            score: existing?.score ?? 0,
+            isConnected: true,
+            isReady: false,
+            isWaiting: true,
+            totalThrows: existing?.totalThrows ?? 0,
+            currentThrows: existing?.currentThrows ?? 0,
+            throwScores: existing?.throwScores ?? [],
+            dartDeadlineEndsAt: undefined,
+            turnDelayEndsAt: undefined,
+          });
+
+          playersRef.current = next;
+          return next;
+        });
+
+        setPlayerOrder((prev) =>
+          prev.includes(waitingKey) ? prev : [...prev, waitingKey]
+        );
+        return;
+      }
+
       const startsNewGame = isRegistration ? resetAggregationForNewGame() : false;
       window.dispatchEvent(new CustomEvent("GAME_STARTED"));
 

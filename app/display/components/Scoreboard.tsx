@@ -1,4 +1,5 @@
 import type { PlayerScore } from "@/app/display/types";
+import { MAX_PLAYERS } from "@/lib/room";
 
 type ScoreboardProps = {
   players: Map<string, PlayerScore>;
@@ -67,17 +68,25 @@ export default function Scoreboard({ players }: ScoreboardProps) {
   };
 
   return (
-    <div className="absolute top-0 left-0 w-full bg-white/20 backdrop-blur-md flex gap-5 p-5 z-10 shadow-md">
-      {playerList.map((player) => (
-        <div
-          key={
-            player.slot ? `slot-${player.slot}` : player.socketId || player.name
-          }
-          className="flex-1 bg-white/40 rounded-lg"
-        >
-          {renderPlayerCard(player)}
+    <div className="absolute top-0 left-0 z-10 w-full bg-white/20 p-5 shadow-md backdrop-blur-md">
+      <div className="mb-3 flex items-center justify-between text-white">
+        <div className="text-[1rem] font-semibold opacity-80">참가자</div>
+        <div className="rounded-md bg-black/35 px-3 py-1 text-[0.9rem] font-bold tabular-nums">
+          {playerList.length}/{MAX_PLAYERS}
         </div>
-      ))}
+      </div>
+      <div className="flex gap-5">
+        {playerList.map((player) => (
+          <div
+            key={
+              player.slot ? `slot-${player.slot}` : player.socketId || player.name
+            }
+            className="flex-1 bg-white/40 rounded-lg"
+          >
+            {renderPlayerCard(player)}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -159,6 +159,19 @@ export function useQueue({
       onEnterGame(slot, players);
     };
 
+    const emitQueueRegistration = () => {
+      if (!socket.connected || !socket.id) return;
+
+      socket.emit("aim-update", {
+        room,
+        socketId: socket.id,
+        name,
+        aim: { x: 0, y: 0 },
+        registration: true,
+        queueRegistration: true,
+      });
+    };
+
     const recoverStaleHostQueue = () => {
       if (staleHostRecoveryRequestedRef.current || !socket.connected) return;
 
@@ -181,6 +194,7 @@ export function useQueue({
         if (socket.id) {
           lastJoinedSocketIdRef.current = socket.id;
         }
+        emitQueueRegistration();
         socket.emit("status-queue");
         staleHostRecoveryRequestedRef.current = false;
       }, 300);
@@ -207,6 +221,7 @@ export function useQueue({
           if (socket.id) {
             lastJoinedSocketIdRef.current = socket.id;
           }
+          emitQueueRegistration();
         }
         staleHostRecoveryDeadlineRef.current = null;
       }
@@ -264,8 +279,17 @@ export function useQueue({
       enterGame(slot, players);
     };
 
-    const onAimUpdate = (data: { socketId?: string; registration?: boolean }) => {
-      if (!data.registration || !data.socketId || data.socketId === socket.id) {
+    const onAimUpdate = (data: {
+      socketId?: string;
+      registration?: boolean;
+      queueRegistration?: boolean;
+    }) => {
+      if (
+        data.queueRegistration ||
+        !data.registration ||
+        !data.socketId ||
+        data.socketId === socket.id
+      ) {
         return;
       }
 
@@ -286,6 +310,7 @@ export function useQueue({
         if (socket.id) {
           lastJoinedSocketIdRef.current = socket.id;
         }
+        emitQueueRegistration();
       }
       debugLog("[Queue] status-queue 요청");
       socket.emit("status-queue");
@@ -318,6 +343,7 @@ export function useQueue({
     const heartbeatId = window.setInterval(() => {
       if (!socket.connected || !joinedQueueRef.current) return;
       debugLog("[Queue] heartbeat status-queue");
+      emitQueueRegistration();
       socket.emit("status-queue");
     }, 8000);
 
