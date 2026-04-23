@@ -298,7 +298,7 @@ export function useDisplaySocket({
             score: existing?.score ?? 0,
             isConnected: true,
             isReady: existing?.isReady ?? false,
-            isWaiting: existing?.isWaiting ?? true,
+            isWaiting: false,
             totalThrows: existing?.totalThrows ?? 0,
             currentThrows: existing?.currentThrows ?? 0,
             throwScores: existing?.throwScores ?? [],
@@ -320,46 +320,6 @@ export function useDisplaySocket({
       const uniqueQueue = Array.from(new Set(queue)).filter(Boolean);
       queuedPlayerIdsRef.current = uniqueQueue.slice(0, MAX_PLAYERS);
       onLog?.(`Queue players: ${uniqueQueue.length}`);
-
-      setPlayers((prev) => {
-        const next = new Map(prev);
-        const queueKeys = new Set(
-          uniqueQueue.map((socketId) => getQueuePlayerKey(socketId))
-        );
-
-        Array.from(next.entries()).forEach(([key, player]) => {
-          if (player.isWaiting && !queueKeys.has(key)) {
-            next.delete(key);
-          }
-        });
-
-        uniqueQueue.forEach((socketId, index) => {
-          const alreadyRegistered = Array.from(next.values()).some(
-            (player) => player.slot && player.socketId === socketId
-          );
-
-          if (alreadyRegistered) return;
-
-          const key = getQueuePlayerKey(socketId);
-          if (next.has(key)) return;
-
-          next.set(key, {
-            socketId,
-            name: `대기 ${index + 1}`,
-            score: 0,
-            isConnected: true,
-            isReady: false,
-            isWaiting: true,
-            totalThrows: 0,
-            currentThrows: 0,
-            throwScores: [],
-            dartDeadlineEndsAt: undefined,
-          });
-        });
-
-        playersRef.current = next;
-        return next;
-      });
     };
 
     const onDartThrown = (data: {
