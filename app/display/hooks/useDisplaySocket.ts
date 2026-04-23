@@ -12,7 +12,7 @@ import {
   MAX_PLAYERS,
   type PlayerSlot,
 } from "@/lib/room";
-import { getRouletteRadius } from "../three/Scene";
+import { getRouletteCenter, getRouletteRadius } from "../three/Scene";
 import {
   clamp,
   getHitScoreFromAim as getHitScoreFromAimBase,
@@ -45,7 +45,11 @@ function getCurrentRouletteRadius(): number {
 }
 
 function getHitScoreFromAim(aim?: { x: number; y: number }): number {
-  return getHitScoreFromAimBase(aim, getCurrentRouletteRadius());
+  return getHitScoreFromAimBase(
+    aim,
+    getCurrentRouletteRadius(),
+    getRouletteCenter()
+  );
 }
 
 function resolvePlayerKey(data: {

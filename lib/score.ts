@@ -25,6 +25,9 @@ export const SCORES = {
 } as const;
 
 export type Zone = "BULL" | "TRIPLE" | "DOUBLE" | "SINGLE" | "MISS";
+export type Point2D = { x: number; y: number };
+
+const DEFAULT_ROULETTE_CENTER: Point2D = { x: 0, y: 0 };
 
 export function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
@@ -35,6 +38,21 @@ export function aimTo3D(aim: { x: number; y: number }): { x: number; y: number }
     x: aim.x * AIM_TO_3D_SCALE,
     y: aim.y * AIM_TO_3D_SCALE,
   };
+}
+
+function getDistanceFromAim(
+  aim: { x: number; y: number },
+  rouletteCenter: Point2D
+): number {
+  const pos3D = aimTo3D({
+    x: clamp(aim.x, -1, 1),
+    y: clamp(aim.y, -1, 1),
+  });
+
+  return Math.hypot(
+    pos3D.x - rouletteCenter.x,
+    pos3D.y - rouletteCenter.y
+  );
 }
 
 export function getZoneFromRatio(ratio: number): Zone {
@@ -52,16 +70,12 @@ export function getScoreFromZone(zone: Zone): number {
 
 export function getHitScoreFromAim(
   aim?: { x: number; y: number },
-  rouletteRadius: number = DEFAULT_ROULETTE_RADIUS
+  rouletteRadius: number = DEFAULT_ROULETTE_RADIUS,
+  rouletteCenter: Point2D = DEFAULT_ROULETTE_CENTER
 ): number {
   if (!aim) return 0;
 
-  const pos3D = aimTo3D({
-    x: clamp(aim.x, -1, 1),
-    y: clamp(aim.y, -1, 1),
-  });
-
-  const distance = Math.hypot(pos3D.x, pos3D.y);
+  const distance = getDistanceFromAim(aim, rouletteCenter);
   const ratio = distance / rouletteRadius;
   const zone = getZoneFromRatio(ratio);
 
@@ -70,14 +84,10 @@ export function getHitScoreFromAim(
 
 export function getZoneFromAim(
   aim: { x: number; y: number },
-  rouletteRadius: number = DEFAULT_ROULETTE_RADIUS
+  rouletteRadius: number = DEFAULT_ROULETTE_RADIUS,
+  rouletteCenter: Point2D = DEFAULT_ROULETTE_CENTER
 ): Zone {
-  const pos3D = aimTo3D({
-    x: clamp(aim.x, -1, 1),
-    y: clamp(aim.y, -1, 1),
-  });
-
-  const distance = Math.hypot(pos3D.x, pos3D.y);
+  const distance = getDistanceFromAim(aim, rouletteCenter);
   const ratio = distance / rouletteRadius;
 
   return getZoneFromRatio(ratio);

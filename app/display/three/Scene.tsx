@@ -8,6 +8,7 @@ import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
 const DART_MODEL_SCALE = 24;
 const ROULETTE_MODEL_SCALE = 12;
+const ROULETTE_MODEL_POSITION: [number, number, number] = [0, -2, 0];
 const DART_MODEL_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
 const DART_MODEL_PATHS = [
   "/models/dart_blue.glb",
@@ -136,7 +137,7 @@ function Roulette({
   }, [rouletteScene]);
 
   return (
-    <group scale={ROULETTE_MODEL_SCALE}>
+    <group position={ROULETTE_MODEL_POSITION} scale={ROULETTE_MODEL_SCALE}>
       <primitive object={rouletteScene} />
 
       {flyingDarts.map((dart) => (
@@ -161,6 +162,13 @@ function Roulette({
 
 export function getRouletteRadius(): number {
   return cachedRouletteRadius;
+}
+
+export function getRouletteCenter(): { x: number; y: number } {
+  return {
+    x: ROULETTE_MODEL_POSITION[0],
+    y: ROULETTE_MODEL_POSITION[1],
+  };
 }
 
 function DartEventHandler({
@@ -192,10 +200,12 @@ function DartEventHandler({
       if (!hasIntersection) return;
 
       const ownerKey = data.playerId || data.name || data.socketId || "player";
-      onDartThrow(
-        [intersectPoint.x, intersectPoint.y, intersectPoint.z],
-        ownerKey,
-      );
+      const targetPosition: [number, number, number] = [
+        intersectPoint.x - ROULETTE_MODEL_POSITION[0],
+        intersectPoint.y - ROULETTE_MODEL_POSITION[1],
+        intersectPoint.z - ROULETTE_MODEL_POSITION[2],
+      ];
+      onDartThrow(targetPosition, ownerKey);
     };
 
     window.addEventListener("DART_THROW", handleThrow);
