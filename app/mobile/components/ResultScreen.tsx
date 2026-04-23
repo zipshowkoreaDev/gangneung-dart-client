@@ -60,12 +60,7 @@ export default function ResultScreen({
         </div>
       </div>
 
-      {typeof countdown === "number" ? (
-        <div className="text-white/80 text-center">
-          <div className="text-sm mb-2">자동 종료까지</div>
-          <div className="text-6xl font-bold tabular-nums">{countdown}</div>
-        </div>
-      ) : (
+      {typeof countdown !== "number" && (
         <button
           onClick={onExit}
           className="py-5 px-10 text-2xl font-bold rounded-2xl border-none bg-gradient-to-br from-[#FFD700] to-[#FFA500] text-black shadow-[0_8px_32px_rgba(255,215,0,0.4)] transition-all"

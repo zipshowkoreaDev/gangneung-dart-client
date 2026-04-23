@@ -155,14 +155,6 @@ export default function DisplayPage() {
             <div className="text-3xl font-semibold mb-10">
               {winners[0]?.score}점
             </div>
-            {typeof endCountdown === "number" && (
-              <div>
-                <div className="text-sm text-white/60 mb-2">다음 게임까지</div>
-                <div className="text-7xl font-bold tabular-nums">
-                  {endCountdown}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

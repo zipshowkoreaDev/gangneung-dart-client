@@ -1,6 +1,7 @@
 "use client";
 
 import { aimToDisplayPosition } from "@/lib/displayAimCoordinates";
+import { getPlayerColor } from "@/app/display/utils/playerColors";
 
 type AimPosition = {
   x: number;
@@ -16,8 +17,7 @@ type AimOverlayProps = {
 
 function resolveColor(playerKey: string, playerOrder: string[]) {
   const index = playerOrder.indexOf(playerKey);
-  const colors = ["#ff4d4d", "#4da3ff", "#ffd54f", "#66bb6a"];
-  return colors[index] ?? "#ffffff";
+  return getPlayerColor(index);
 }
 
 export default function AimOverlay({

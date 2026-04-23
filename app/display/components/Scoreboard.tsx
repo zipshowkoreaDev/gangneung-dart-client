@@ -1,4 +1,5 @@
 import type { PlayerScore } from "@/app/display/types";
+import { getPlayerColor } from "@/app/display/utils/playerColors";
 import { MAX_PLAYERS } from "@/lib/room";
 
 type ScoreboardProps = {
@@ -13,37 +14,39 @@ export default function Scoreboard({ players }: ScoreboardProps) {
 
   if (playerList.length === 0) return null;
 
-  const renderThrowScores = (player: PlayerScore) => {
-    const scores = Array.from({ length: 3 }, (_, index) => ({
-      label: index === 0 ? "1st" : index === 1 ? "2nd" : "3rd",
-      score: player.throwScores?.[index],
-    }));
+  const renderThrowDots = (player: PlayerScore, playerIndex: number) => {
+    const color = getPlayerColor(playerIndex);
+    const remainingThrows = Math.max(0, 3 - player.totalThrows);
 
     return (
-      <div className="flex items-center justify-center gap-3 text-[1.25rem] font-semibold leading-none text-[#FFD700]/85">
-        {scores.map((item) => (
-          <div key={item.label} className="flex items-baseline gap-1">
-            <span className="text-[#FFD700]/55">{item.label}</span>
-            <span>{item.score ?? "-"}</span>
-          </div>
+      <div
+        className="flex shrink-0 items-center gap-[0.55rem]"
+        aria-label={`남은 투척 횟수 ${remainingThrows}/3`}
+      >
+        {Array.from({ length: 3 }, (_, index) => (
+          <span
+            key={index}
+            className="block h-[clamp(0.55rem,2cqw,0.85rem)] w-[clamp(0.55rem,2cqw,0.85rem)] rounded-full border"
+            style={{
+              backgroundColor:
+                index < remainingThrows ? color : "rgba(255, 255, 255, 0.14)",
+              borderColor:
+                index < remainingThrows ? color : "rgba(255, 255, 255, 0.35)",
+              boxShadow:
+                index < remainingThrows ? `0 0 10px ${color}99` : "none",
+            }}
+          />
         ))}
       </div>
     );
   };
 
-  const renderPlayerCard = (player: PlayerScore) => {
-    const hasPlayed = player.totalThrows >= 3;
-    const hasScore = !player.isWaiting && player.totalThrows > 0;
-    const remainingThrows = Math.max(0, 3 - player.totalThrows);
-    const statusText = player.isWaiting
-      ? "입장 대기 중"
-      : hasPlayed
-        ? "플레이 완료"
-        : `남은 기회: ${remainingThrows}`;
+  const renderPlayerCard = (player: PlayerScore, playerIndex: number) => {
+    const throwScores = player.throwScores ?? [];
 
     return (
       <div
-        className="flex-1 flex flex-col items-center justify-center gap-2 p-5 rounded-lg transition-all"
+        className="flex h-[clamp(6.8rem,15cqw,8.5rem)] flex-1 flex-col justify-between gap-3 rounded-lg p-[clamp(0.8rem,2.6cqw,1.25rem)] transition-all"
         style={{
           background: player.isWaiting
             ? "rgba(255, 255, 255, 0.12)"
@@ -53,16 +56,25 @@ export default function Scoreboard({ players }: ScoreboardProps) {
           opacity: 1,
         }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-[1.5rem] font-bold">{player.name}</span>
+        <div className="flex min-w-0 items-center justify-between gap-4">
+          <span className="min-w-0 flex-1 truncate text-left text-[clamp(0.95rem,3cqw,1.5rem)] font-bold leading-none">
+            {player.name}
+          </span>
+          {renderThrowDots(player, playerIndex)}
         </div>
 
-        {renderThrowScores(player)}
-
-        <div className="text-[2rem] font-bold text-[#FFD700]">
-          {hasScore ? `${player.score} 점` : ""}
+        <div className="flex min-h-[clamp(1.45rem,4cqw,2rem)] items-center justify-between gap-[clamp(0.45rem,2cqw,1rem)] text-[clamp(1.05rem,3.6cqw,2rem)] font-bold leading-none text-[#FFD700]">
+          <div className="flex min-w-0 items-center gap-[clamp(0.35rem,1.5cqw,0.75rem)] text-left">
+            {throwScores.map((score, index) => (
+              <span key={`${index}-${score}`} className="shrink-0">
+                {score}
+              </span>
+            ))}
+          </div>
+          <div className="shrink-0 text-right">
+            {throwScores.length > 0 ? `${player.score}점` : ""}
+          </div>
         </div>
-        <div className="text-[0.75rem] opacity-70">{statusText}</div>
       </div>
     );
   };
@@ -76,14 +88,14 @@ export default function Scoreboard({ players }: ScoreboardProps) {
         </div>
       </div>
       <div className="flex gap-5">
-        {playerList.map((player) => (
+        {playerList.map((player, index) => (
           <div
             key={
               player.slot ? `slot-${player.slot}` : player.socketId || player.name
             }
             className="flex-1 bg-white/40 rounded-lg"
           >
-            {renderPlayerCard(player)}
+            {renderPlayerCard(player, index)}
           </div>
         ))}
       </div>
