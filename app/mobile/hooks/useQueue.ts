@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { socket } from "@/shared/socket";
 import {
-  getAllPlayerRooms,
   getSlotFromPosition,
   MAX_PLAYERS,
   type PlayerSlot,
@@ -241,9 +240,6 @@ export function useQueue({
 
     const onConnect = () => {
       debugLog("[Socket] connected (queue mode)");
-      getAllPlayerRooms(room).forEach((playerRoom) => {
-        socket.emit("joinRoom", { room: playerRoom, name });
-      });
 
       if (!joinedQueueRef.current || lastJoinedSocketIdRef.current !== socket.id) {
         debugLog("[Queue] join-queue emit");

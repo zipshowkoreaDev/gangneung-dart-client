@@ -7,8 +7,6 @@ import {
 } from "react";
 import { socket } from "@/shared/socket";
 import {
-  getDisplayRoom,
-  getAllPlayerRooms,
   MAX_PLAYERS,
   type PlayerSlot,
 } from "@/lib/room";
@@ -22,6 +20,8 @@ import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import type { PlayerScore } from "@/app/display/types";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
+const QUEUE_STATUS_INTERVAL_MS = 1000;
+const GAME_END_CLOSE_DELAY_MS = 5000;
 
 interface UseDisplaySocketProps {
   room: string;
@@ -149,18 +149,13 @@ export function useDisplaySocket({
     []
   );
 
-  const QUEUE_STATUS_INTERVAL_MS = 1000;
-
   useEffect(() => {
     if (!room) return;
 
-    const displayRoom = getDisplayRoom(room);
-    const playerRooms = getAllPlayerRooms(room);
-    const playerRoomSet = new Set(playerRooms);
-    const isPlayerRoomEvent = (roomName?: string) =>
-      !roomName || playerRoomSet.has(roomName);
-    const getRoomSlot = (roomName?: string): PlayerSlot | undefined => {
-      const slotIndex = roomName ? playerRooms.indexOf(roomName) : -1;
+    const isRoomEvent = (roomName?: string) => !roomName || roomName === room;
+    const getQueuedSocketSlot = (socketId?: string): PlayerSlot | undefined => {
+      if (!socketId) return undefined;
+      const slotIndex = queuedPlayerIdsRef.current.indexOf(socketId);
       return slotIndex >= 0 ? ((slotIndex + 1) as PlayerSlot) : undefined;
     };
     const resolveDisplayPlayerKey = (data: {
@@ -168,8 +163,11 @@ export function useDisplaySocket({
       playerId?: string;
       name?: string;
       socketId?: string;
+      slot?: PlayerSlot;
     }) => {
-      const slotKey = getSlotPlayerKey(getRoomSlot(data.room));
+      const slotKey = getSlotPlayerKey(
+        data.slot ?? getQueuedSocketSlot(data.socketId)
+      );
       if (slotKey) return slotKey;
 
       const aliases = [data.socketId, data.playerId, data.name].filter(
@@ -201,25 +199,17 @@ export function useDisplaySocket({
       label: string,
       data: { room: string; playerCount: number }
     ) => {
-      const actualPlayerCount = Math.max(0, data.playerCount - 1);
-      onLog?.(`${label}: ${data.room}, Players: ${actualPlayerCount}`);
+      onLog?.(`${label}: ${data.room}, Players: ${data.playerCount}`);
     };
 
     if (!socket.connected) {
-      socket.io.opts.query = { room, name: "_display" };
+      socket.io.opts.query = { room };
       socket.connect();
     }
 
     const onConnect = () => {
       onLog?.(`Socket connected: ${socket.id}`);
-
-      socket.emit("joinRoom", { room: displayRoom, name: "_display" });
-      onLog?.(`Joined display room: ${displayRoom}`);
-
-      playerRooms.forEach((playerRoom) => {
-        socket.emit("joinRoom", { room: playerRoom, name: "_display" });
-        onLog?.(`Subscribed to player room: ${playerRoom}`);
-      });
+      onLog?.(`Observing room: ${room}`);
 
       socket.emit("status-queue");
     };
@@ -308,11 +298,12 @@ export function useDisplaySocket({
       room: string;
       name?: string;
       socketId?: string;
+      slot?: PlayerSlot;
       skin?: string;
       aim: { x: number; y: number };
       score?: number;
     }) => {
-      if (!isPlayerRoomEvent(data.room)) return;
+      if (!isRoomEvent(data.room)) return;
 
       const key = resolveDisplayPlayerKey(data);
       rememberPlayerAliases(key, data);
@@ -325,7 +316,8 @@ export function useDisplaySocket({
         return;
       }
 
-      const score = getHitScoreFromAim(data.aim);
+      const score =
+        typeof data.score === "number" ? data.score : getHitScoreFromAim(data.aim);
       const hitSound = new Audio("/sound/hit.mp3");
       hitSound.play().catch((e) => {
         onLog?.(`Sound play failed: ${String(e)}`);
@@ -383,22 +375,23 @@ export function useDisplaySocket({
       playerId?: string;
       name?: string;
       socketId?: string;
+      slot?: PlayerSlot;
       skin?: string;
       registration?: boolean;
       aim: { x: number; y: number };
     }) => {
-      if (!isPlayerRoomEvent(data.room)) return;
+      if (!isRoomEvent(data.room)) return;
 
       const key = resolveDisplayPlayerKey(data);
       rememberPlayerAliases(key, data);
       const x = clamp(data.aim?.x ?? 0, -1, 1);
       const y = clamp(data.aim?.y ?? 0, -1, 1);
       const displayName = data.name ? stripDisplayName(data.name) : key;
-      const slot = getRoomSlot(data.room);
+      const slot = data.slot ?? getQueuedSocketSlot(data.socketId);
       const isRegistration = data.registration === true;
       const startsNewGame = isRegistration ? resetAggregationForNewGame() : false;
 
-      if (key && key !== "_display") {
+      if (key) {
         if (startsNewGame) {
           setAimPositions(new Map());
           setPlayerOrder([]);
@@ -507,9 +500,10 @@ export function useDisplaySocket({
       playerId?: string;
       name?: string;
       socketId?: string;
+      slot?: PlayerSlot;
       totalThrows?: number;
     }) => {
-      if (!isPlayerRoomEvent(data.room)) return;
+      if (!isRoomEvent(data.room)) return;
 
       const key = resolveDisplayPlayerKey(data);
       rememberPlayerAliases(key, data);
@@ -519,7 +513,7 @@ export function useDisplaySocket({
         return next;
       });
 
-      if (key !== "_display") {
+      if (key) {
         if (finishedPlayerKeysRef.current.has(key)) {
           onLog?.(`Ignored duplicate aim-off: ${key}`);
           return;
@@ -594,6 +588,9 @@ export function useDisplaySocket({
             gameId
           );
           emitFinishGame(data.room, finishedPlayers);
+          window.setTimeout(() => {
+            socket.emit("disconnect-room", { room: data.room });
+          }, GAME_END_CLOSE_DELAY_MS);
           window.dispatchEvent(
             new CustomEvent("GAME_FINISHED", {
               detail: {

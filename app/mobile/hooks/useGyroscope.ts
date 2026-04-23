@@ -37,6 +37,7 @@ interface UseGyroscopeProps {
   emitThrowDart: (payload: {
     aim: { x: number; y: number };
     zone: HitZone;
+    score: number;
   }) => void;
   rouletteRadius?: number;
 }
@@ -161,6 +162,7 @@ export function useGyroscope({
       emitThrowDart({
         aim,
         zone: hitResult.zone,
+        score: hitResult.score,
       });
 
       throwCountRef.current += 1;

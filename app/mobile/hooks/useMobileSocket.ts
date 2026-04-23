@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef } from "react";
 import { socket } from "@/shared/socket";
-import { getAllPlayerRooms, getPlayerRoom, type PlayerSlot } from "@/lib/room";
+import type { PlayerSlot } from "@/lib/room";
 import { debugLog } from "@/app/mobile/debugLog";
 
 interface UseMobileSocketProps {
@@ -21,7 +21,6 @@ export function useMobileSocket({
   const throwCountRef = useRef(0);
   const hasJoinedRef = useRef(false);
   const currentRoomRef = useRef<string>("");
-  const joinedRoomsRef = useRef<Set<string>>(new Set());
   const slotRef = useRef<PlayerSlot | null>(null);
 
   const onPlayerFinishedRef = useRef(onPlayerFinished);
@@ -41,10 +40,7 @@ export function useMobileSocket({
   useEffect(() => {
     if (!room || !enabled || !slot) return;
 
-    const playerRoom = getPlayerRoom(room, slot);
-    const playerRooms = getAllPlayerRooms(room);
-
-    if (hasJoinedRef.current && currentRoomRef.current === playerRoom) {
+    if (hasJoinedRef.current && currentRoomRef.current === room) {
       return;
     }
 
@@ -54,21 +50,19 @@ export function useMobileSocket({
     }
 
     const joinPlayerRoom = () => {
-      if (hasJoinedRef.current && currentRoomRef.current === playerRoom) return;
-      debugLog(`[Socket] joinRoom: ${playerRoom}, name: ${name}`);
-      playerRooms.forEach((targetRoom) => {
-        socket.emit("joinRoom", { room: targetRoom, name });
-        joinedRoomsRef.current.add(targetRoom);
-      });
+      if (hasJoinedRef.current && currentRoomRef.current === room) return;
+      debugLog(`[Socket] joinRoom: ${room}, name: ${name}`);
+      socket.emit("joinRoom", { room, name });
       socket.emit("aim-update", {
-        room: playerRoom,
+        room,
         socketId: socket.id,
         name,
+        slot,
         aim: { x: 0, y: 0 },
         registration: true,
       });
       hasJoinedRef.current = true;
-      currentRoomRef.current = playerRoom;
+      currentRoomRef.current = room;
     };
 
     const handleConnect = () => {
@@ -87,7 +81,7 @@ export function useMobileSocket({
       }
 
       const playerId = data.socketId || data.playerId || data.name;
-      if (!playerId || playerId === "_display") return;
+      if (!playerId) return;
       debugLog(`[Socket] player finished: ${playerId}`);
       onPlayerFinishedRef.current?.(playerId);
     };
@@ -116,11 +110,9 @@ export function useMobileSocket({
 
   const leaveJoinedRooms = useCallback((reason: string) => {
     if (!socket.connected) return;
-    const joinedRooms = Array.from(joinedRoomsRef.current);
-    joinedRooms.forEach((joinedRoom) => {
-      debugLog(`[Socket] leaveRoom (${reason}): ${joinedRoom}`);
-      socket.emit("leaveRoom", { room: joinedRoom });
-    });
+    if (!currentRoomRef.current) return;
+    debugLog(`[Socket] leaveRoom (${reason}): ${currentRoomRef.current}`);
+    socket.emit("leaveRoom", { room: currentRoomRef.current });
   }, []);
 
   // unmount 시 정리
@@ -135,11 +127,11 @@ export function useMobileSocket({
   const emitAimUpdate = useCallback(
     (aim: { x: number; y: number }, skin?: string) => {
       if (!socket.connected || !slotRef.current) return;
-      const playerRoom = getPlayerRoom(room, slotRef.current);
       socket.emit("aim-update", {
-        room: playerRoom,
+        room,
         socketId: socket.id,
         name,
+        slot: slotRef.current,
         skin,
         aim,
       });
@@ -148,15 +140,20 @@ export function useMobileSocket({
   );
 
   const emitThrowDart = useCallback(
-    (payload: { aim: { x: number; y: number }; zone?: string }) => {
+    (payload: {
+      aim: { x: number; y: number };
+      zone?: string;
+      score: number;
+    }) => {
       if (!socket.connected || !slotRef.current) return;
       if (throwCountRef.current >= 3) return;
-      const playerRoom = getPlayerRoom(room, slotRef.current);
       socket.emit("throw-dart", {
-        room: playerRoom,
+        room,
         socketId: socket.id,
         name,
+        slot: slotRef.current,
         aim: payload.aim,
+        score: payload.score,
         zone: payload.zone,
       });
 
@@ -167,11 +164,11 @@ export function useMobileSocket({
 
   const emitAimOff = useCallback(() => {
     if (!socket.connected || !slotRef.current) return;
-    const playerRoom = getPlayerRoom(room, slotRef.current);
     socket.emit("aim-off", {
-      room: playerRoom,
+      room,
       socketId: socket.id,
       name,
+      slot: slotRef.current,
       ...(throwCountRef.current >= 3
         ? {
             totalThrows: throwCountRef.current,
@@ -195,7 +192,6 @@ export function useMobileSocket({
     throwCountRef.current = 0;
     hasJoinedRef.current = false;
     currentRoomRef.current = "";
-    joinedRoomsRef.current.clear();
     slotRef.current = null;
   }, [leaveJoinedRooms, name]);
 

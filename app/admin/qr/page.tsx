@@ -53,7 +53,7 @@ export default function AdminQRPage() {
       socket.connect();
     }
 
-    socket.emit("reset-queue");
+    socket.emit("reset-queue", { project: "dart" });
     alert("전체 리셋 요청을 보냈습니다.");
   };
 
