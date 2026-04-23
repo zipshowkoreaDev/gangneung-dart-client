@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
 const DART_MODEL_SCALE = 24;
-const ROULETTE_MODEL_SCALE = 1.4;
+const ROULETTE_MODEL_SCALE = 12;
 const DART_MODEL_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
 const DART_MODEL_PATHS = [
   "/models/dart_blue.glb",
@@ -137,7 +137,7 @@ function Roulette({
 
   return (
     <group scale={ROULETTE_MODEL_SCALE}>
-      <primitive object={rouletteScene} rotation={[0, -Math.PI / 2, 0]} />
+      <primitive object={rouletteScene} />
 
       {flyingDarts.map((dart) => (
         <FlyingDart

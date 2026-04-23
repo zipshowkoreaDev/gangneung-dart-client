@@ -18,7 +18,6 @@ import {
   getHitScoreFromAim as getHitScoreFromAimBase,
   DEFAULT_ROULETTE_RADIUS,
 } from "@/lib/score";
-import { isAimInsideDisplayBounds } from "@/lib/displayAimBounds";
 import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import type { PlayerScore } from "@/app/display/types";
 
@@ -322,9 +321,7 @@ export function useDisplaySocket({
         return;
       }
 
-      const score = isAimInsideDisplayBounds(data.aim)
-        ? getHitScoreFromAim(data.aim)
-        : 0;
+      const score = getHitScoreFromAim(data.aim);
       const hitSound = new Audio("/sound/hit.mp3");
       hitSound.play().catch((e) => {
         onLog?.(`Sound play failed: ${String(e)}`);
