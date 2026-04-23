@@ -131,6 +131,7 @@ export default function MobilePage() {
       name: socketName,
       enabled: hasJoined,
       slot: assignedSlot,
+      roomJoinedBeforeGame: true,
       onPlayerFinished: handlePlayerFinished,
       onPlayerScored: handlePlayerScored,
       onGameResult: setGameResult,

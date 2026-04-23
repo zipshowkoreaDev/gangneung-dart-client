@@ -8,6 +8,7 @@ interface UseMobileSocketProps {
   name: string;
   enabled: boolean;
   slot: PlayerSlot | null;
+  roomJoinedBeforeGame?: boolean;
   onPlayerFinished?: (playerId: string) => void;
   onPlayerScored?: (player: {
     socketId: string;
@@ -34,6 +35,7 @@ export function useMobileSocket({
   name,
   enabled,
   slot,
+  roomJoinedBeforeGame = false,
   onPlayerFinished,
   onPlayerScored,
   onGameResult,
@@ -86,7 +88,7 @@ export function useMobileSocket({
     }
   }, [slot, enabled]);
 
-  // enabled && slot이 있을 때 joinRoom
+  // enabled && slot이 있을 때 게임 등록
   useEffect(() => {
     if (!room || !enabled || !slot) return;
 
@@ -117,8 +119,10 @@ export function useMobileSocket({
       if (gameEndedRef.current) return;
       if (hasJoinedRef.current && currentRoomRef.current === room) return;
       syncCurrentSocketId();
-      debugLog(`[Socket] joinRoom: ${room}, name: ${name}`);
-      socket.emit("joinRoom", { room, name });
+      if (!roomJoinedBeforeGame) {
+        debugLog(`[Socket] joinRoom: ${room}, name: ${name}`);
+        socket.emit("joinRoom", { room, name });
+      }
       emitRegistration();
       registrationTimerIds.push(
         window.setTimeout(emitRegistration, 300),
@@ -260,7 +264,7 @@ export function useMobileSocket({
       socket.off("joinedRoom", handleJoinedRoom);
       socket.off("roomPlayerCount", handleRoomPlayerCount);
     };
-  }, [room, name, enabled, slot, syncCurrentSocketId]);
+  }, [room, name, enabled, slot, roomJoinedBeforeGame, syncCurrentSocketId]);
 
   const leaveJoinedRooms = useCallback((reason: string) => {
     if (!socket.connected) return;

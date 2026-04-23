@@ -72,6 +72,7 @@ export function useQueue({
   const hostApprovalDeadlineRef = useRef<number | null>(null);
   const staleHostRecoveryDeadlineRef = useRef<number | null>(null);
   const staleHostRecoveryRequestedRef = useRef(false);
+  const joinedRoomRef = useRef(false);
 
   const clearApprovalWait = useCallback(() => {
     setIsWaitingForApproval(false);
@@ -88,6 +89,11 @@ export function useQueue({
       socket.emit("leave-queue");
       joinedQueueRef.current = false;
     }
+    if (joinedRoomRef.current) {
+      debugLog("[Queue] leaveRoom emit");
+      socket.emit("leaveRoom", { room });
+      joinedRoomRef.current = false;
+    }
     setIsInQueue(false);
     setQueuePosition(null);
     setQueueSnapshot(null);
@@ -102,14 +108,18 @@ export function useQueue({
     staleHostRecoveryRequestedRef.current = false;
     startRequestedRef.current = false;
     clearApprovalWait();
-  }, [clearApprovalWait]);
+  }, [clearApprovalWait, room]);
 
   const connectAndJoinQueue = useCallback(() => {
     if (socket.connected) {
       debugLog("[Queue] 기존 소켓 연결 해제 후 재연결");
       socket.emit("leave-queue");
+      if (joinedRoomRef.current) {
+        socket.emit("leaveRoom", { room });
+      }
       socket.disconnect();
       joinedQueueRef.current = false;
+      joinedRoomRef.current = false;
       lastJoinedSocketIdRef.current = null;
     }
     clearApprovalWait();
@@ -139,6 +149,7 @@ export function useQueue({
 
     const enterGame = (slot: PlayerSlot, players: string[]) => {
       clearApprovalWait();
+      joinedRoomRef.current = false;
       debugLog(`[Queue] 게임 시작 승인, 슬롯: ${slot}`);
       onEnterGame(slot, players);
     };
@@ -184,6 +195,14 @@ export function useQueue({
       });
     };
 
+    const joinWaitingRoom = () => {
+      if (!socket.connected || !socket.id || joinedRoomRef.current) return;
+
+      debugLog(`[Queue] joinRoom emit: ${room}, name: ${name}`);
+      socket.emit("joinRoom", { room, name });
+      joinedRoomRef.current = true;
+    };
+
     const recoverStaleHostQueue = () => {
       if (staleHostRecoveryRequestedRef.current || !socket.connected) return;
 
@@ -206,6 +225,7 @@ export function useQueue({
         if (socket.id) {
           lastJoinedSocketIdRef.current = socket.id;
         }
+        joinWaitingRoom();
         emitQueueRegistration();
         socket.emit("status-queue");
         staleHostRecoveryRequestedRef.current = false;
@@ -247,6 +267,7 @@ export function useQueue({
           if (socket.id) {
             lastJoinedSocketIdRef.current = socket.id;
           }
+          joinWaitingRoom();
           emitQueueRegistration();
         }
         staleHostRecoveryDeadlineRef.current = null;
@@ -305,6 +326,31 @@ export function useQueue({
       enterGame(slot, players);
     };
 
+    const onJoinedRoom = (data: {
+      room?: string;
+      playerCount?: number;
+      players?: Array<{ socketId: string; name: string }>;
+    }) => {
+      if (data.room && data.room !== room) return;
+
+      setQueuedPlayerNames((prev) => {
+        const next = new Map(prev);
+        let changed = false;
+
+        data.players?.forEach((player) => {
+          if (!player.socketId || !player.name) return;
+
+          const displayName = stripDisplayName(player.name);
+          if (next.get(player.socketId) === displayName) return;
+
+          next.set(player.socketId, displayName);
+          changed = true;
+        });
+
+        return changed ? next : prev;
+      });
+    };
+
     const onAimUpdate = (data: {
       socketId?: string;
       name?: string;
@@ -347,6 +393,7 @@ export function useQueue({
         if (socket.id) {
           lastJoinedSocketIdRef.current = socket.id;
         }
+        joinWaitingRoom();
         emitQueueRegistration();
       }
       debugLog("[Queue] status-queue 요청");
@@ -373,6 +420,7 @@ export function useQueue({
     socket.on("connect_error", onConnectError);
     socket.on("error", onError);
     socket.on("roomFull", onRoomFull);
+    socket.on("joinedRoom", onJoinedRoom);
     socket.on("status-queue", onStatusQueue);
     socket.on(GAME_STARTED_EVENT, onGameStarted);
     socket.on("aim-update", onAimUpdate);
@@ -439,6 +487,7 @@ export function useQueue({
       socket.off("connect_error", onConnectError);
       socket.off("error", onError);
       socket.off("roomFull", onRoomFull);
+      socket.off("joinedRoom", onJoinedRoom);
       socket.off("status-queue", onStatusQueue);
       socket.off(GAME_STARTED_EVENT, onGameStarted);
       socket.off("aim-update", onAimUpdate);
