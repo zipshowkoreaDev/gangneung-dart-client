@@ -28,6 +28,7 @@ export default function DisplayPage() {
   const [winners, setWinners] = useState<FinishedPlayer[]>([]);
   const [endCountdown, setEndCountdown] = useState<number | null>(null);
   const isShowingGameFinishedRef = useRef(false);
+  const gameSessionRef = useRef(0);
   const {
     aimPositions,
     setAimPositions,
@@ -52,12 +53,22 @@ export default function DisplayPage() {
   });
 
   useEffect(() => {
+    const clearFinishedOverlayForNewGame = () => {
+      gameSessionRef.current += 1;
+      isShowingGameFinishedRef.current = false;
+      setWinners([]);
+      setEndCountdown(null);
+      setIsGameActive(true);
+    };
     const handleDartThrow = () => {
+      if (isShowingGameFinishedRef.current) {
+        clearFinishedOverlayForNewGame();
+        return;
+      }
+
       setIsGameActive(true);
     };
-    const handleGameStarted = () => {
-      setIsGameActive(true);
-    };
+    const handleGameStarted = clearFinishedOverlayForNewGame;
 
     const handleGameFinished = (event: Event) => {
       if (isShowingGameFinishedRef.current) return;
@@ -91,7 +102,9 @@ export default function DisplayPage() {
   useEffect(() => {
     if (endCountdown === null) return;
     if (endCountdown <= 0) {
+      const cleanupSession = gameSessionRef.current;
       const timer = window.setTimeout(() => {
+        if (gameSessionRef.current !== cleanupSession) return;
         setIsGameActive(false);
         setWinners([]);
         setEndCountdown(null);

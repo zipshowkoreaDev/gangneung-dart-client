@@ -92,6 +92,7 @@ export function useDisplaySocket({
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
   const playerAliasKeyRef = useRef<Map<string, string>>(new Map());
   const queuedPlayerIdsRef = useRef<string[]>([]);
+  const gameEndDisconnectTimerRef = useRef<number | null>(null);
 
   // React state 비동기 반영 경쟁 조건 방지: 마지막 점수를 ref로 동기 추적
   const playerLastScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
@@ -201,6 +202,12 @@ export function useDisplaySocket({
       data: { room: string; playerCount: number }
     ) => {
       onLog?.(`${label}: ${data.room}, Players: ${data.playerCount}`);
+    };
+    const clearGameEndDisconnectTimer = () => {
+      if (gameEndDisconnectTimerRef.current === null) return;
+
+      window.clearTimeout(gameEndDisconnectTimerRef.current);
+      gameEndDisconnectTimerRef.current = null;
     };
 
     if (!socket.connected) {
@@ -764,8 +771,10 @@ export function useDisplaySocket({
         ...player,
         name: stripDisplayName(player.name),
       }));
-      window.setTimeout(() => {
+      clearGameEndDisconnectTimer();
+      gameEndDisconnectTimerRef.current = window.setTimeout(() => {
         socket.emit("disconnect-room", { room: data.room });
+        gameEndDisconnectTimerRef.current = null;
       }, GAME_END_CLOSE_DELAY_MS);
       window.dispatchEvent(
         new CustomEvent("GAME_FINISHED", {
@@ -775,6 +784,7 @@ export function useDisplaySocket({
     };
 
     const onGameStarted = (data: { players?: string[] }) => {
+      clearGameEndDisconnectTimer();
       if (Array.isArray(data.players)) {
         const uniquePlayers = Array.from(new Set(data.players)).filter(Boolean);
         queuedPlayerIdsRef.current = uniquePlayers;
@@ -784,6 +794,7 @@ export function useDisplaySocket({
     };
 
     const onResetQueue = () => {
+      clearGameEndDisconnectTimer();
       playerLastScoresRef.current.clear();
       playerAliasKeyRef.current.clear();
       finishedPlayerKeysRef.current.clear();
@@ -793,6 +804,7 @@ export function useDisplaySocket({
     };
 
     const onResetScene = () => {
+      clearGameEndDisconnectTimer();
       playerLastScoresRef.current.clear();
       playerAliasKeyRef.current.clear();
       finishedPlayerKeysRef.current.clear();
@@ -820,6 +832,7 @@ export function useDisplaySocket({
     }, QUEUE_STATUS_INTERVAL_MS);
 
     return () => {
+      clearGameEndDisconnectTimer();
       window.clearInterval(queueStatusTimerId);
       socket.off("connect", onConnect);
       socket.off("clientInfo", onClientInfo);
