@@ -55,6 +55,9 @@ export default function DisplayPage() {
     const handleDartThrow = () => {
       setIsGameActive(true);
     };
+    const handleGameStarted = () => {
+      setIsGameActive(true);
+    };
 
     const handleGameFinished = (event: Event) => {
       if (isShowingGameFinishedRef.current) return;
@@ -76,9 +79,11 @@ export default function DisplayPage() {
     };
 
     window.addEventListener("DART_THROW", handleDartThrow);
+    window.addEventListener("GAME_STARTED", handleGameStarted);
     window.addEventListener("GAME_FINISHED", handleGameFinished);
     return () => {
       window.removeEventListener("DART_THROW", handleDartThrow);
+      window.removeEventListener("GAME_STARTED", handleGameStarted);
       window.removeEventListener("GAME_FINISHED", handleGameFinished);
     };
   }, []);
@@ -111,12 +116,12 @@ export default function DisplayPage() {
       <div className="relative w-full h-full aspect-9/16 max-w-[56.25vh] overflow-hidden bg-black [container-type:inline-size]">
         <Scoreboard players={players} />
         {!isGameActive && <DisplayQRCode url={mobileUrl} />}
+        <DartCanvas />
         <AimOverlay
           aimPositions={aimPositions}
           playerOrder={playerOrder}
           players={players}
         />
-        <DartCanvas />
         <CountdownDisplay players={players} />
         <RankingBoard rankings={rankings} />
         {winners.length > 0 && (

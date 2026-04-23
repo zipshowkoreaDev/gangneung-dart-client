@@ -66,6 +66,7 @@ export default function MobilePage() {
     null,
   );
   const finishGameEmittedRef = useRef(false);
+  const gameCleanupEmittedRef = useRef(false);
 
   const handlePlayerFinished = useCallback((playerId: string) => {
     setFinishedPlayers((prev) => {
@@ -114,9 +115,18 @@ export default function MobilePage() {
     },
     [],
   );
+  const handleSocketGameFinished = useCallback(() => {
+    gameCleanupEmittedRef.current = true;
+  }, []);
 
-  const { emitAimUpdate, emitAimOff, emitThrowDart, leaveGame, socketId } =
-    useMobileSocket({
+  const {
+    emitAimUpdate,
+    emitAimOff,
+    emitThrowDart,
+    cleanupGameSocket,
+    leaveGame,
+    socketId,
+  } = useMobileSocket({
       room,
       name: socketName,
       enabled: hasJoined,
@@ -126,6 +136,7 @@ export default function MobilePage() {
       onGameResult: setGameResult,
       onRoomFull: handleRoomFull,
       onRoomPlayersUpdated: handleRoomPlayersUpdated,
+      onGameFinished: handleSocketGameFinished,
     });
 
   const {
@@ -302,6 +313,14 @@ export default function MobilePage() {
   }, [gameFinished, gamePlayers, playerScores, room, socketId]);
 
   useEffect(() => {
+    if (!gameFinished || gameCleanupEmittedRef.current) return;
+
+    gameCleanupEmittedRef.current = true;
+    cleanupGameSocket("game finished");
+    leaveQueue();
+  }, [cleanupGameSocket, gameFinished, leaveQueue]);
+
+  useEffect(() => {
     if (endCountdown === null) return;
     if (endCountdown <= 0) {
       const timer = window.setTimeout(() => {
@@ -311,6 +330,7 @@ export default function MobilePage() {
         setPlayerScores(new Map());
         setGameResult(null);
         finishGameEmittedRef.current = false;
+        gameCleanupEmittedRef.current = false;
         setEndCountdown(null);
       }, 0);
       return () => window.clearTimeout(timer);

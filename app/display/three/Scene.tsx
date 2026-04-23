@@ -83,13 +83,11 @@ function StuckDart({ position, modelPath }: StuckDartProps) {
 interface FlyingDartProps {
   targetPosition: [number, number, number];
   modelPath: string;
-  onComplete: () => void;
 }
 
 function FlyingDart({
   targetPosition,
   modelPath,
-  onComplete,
 }: FlyingDartProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF(modelPath);
@@ -106,10 +104,7 @@ function FlyingDart({
 
     setProgress((prev) => {
       const next = prev + delta * 1.5; // 속도 조절
-      if (next >= 1) {
-        onComplete();
-        return 1;
-      }
+      if (next >= 1) return 1;
       return next;
     });
 
@@ -191,13 +186,7 @@ function getDartModelPath(ownerKey: string) {
   return DART_MODEL_PATHS[slotIndex] ?? DART_MODEL_PATHS[0];
 }
 
-function Roulette({
-  flyingDarts,
-  stuckDarts,
-}: {
-  flyingDarts: FlyingDartData[];
-  stuckDarts: ThrownDart[];
-}) {
+function Roulette() {
   const { scene } = useGLTF("/models/roulette.glb");
   const rouletteScene = useMemo(() => scene.clone(true), [scene]);
 
@@ -211,23 +200,6 @@ function Roulette({
   return (
     <group position={ROULETTE_MODEL_POSITION} scale={ROULETTE_MODEL_SCALE}>
       <primitive object={rouletteScene} />
-
-      {flyingDarts.map((dart) => (
-        <FlyingDart
-          key={dart.id}
-          targetPosition={dart.position}
-          modelPath={dart.modelPath}
-          onComplete={() => {}}
-        />
-      ))}
-
-      {stuckDarts.map((dart) => (
-        <StuckDart
-          key={dart.id}
-          position={dart.position}
-          modelPath={dart.modelPath}
-        />
-      ))}
     </group>
   );
 }
@@ -273,9 +245,9 @@ function DartEventHandler({
 
       const ownerKey = data.playerId || data.name || data.socketId || "player";
       const targetPosition: [number, number, number] = [
-        intersectPoint.x - ROULETTE_MODEL_POSITION[0],
-        intersectPoint.y - ROULETTE_MODEL_POSITION[1],
-        intersectPoint.z - ROULETTE_MODEL_POSITION[2],
+        intersectPoint.x,
+        intersectPoint.y,
+        intersectPoint.z,
       ];
       onDartThrow(targetPosition, ownerKey);
     };
@@ -354,7 +326,22 @@ export default function Scene() {
       />
       <directionalLight position={[0, 20, 15]} intensity={1.5} />
 
-      <Roulette flyingDarts={flyingDarts} stuckDarts={stuckDarts} />
+      <Roulette />
+      {flyingDarts.map((dart) => (
+        <FlyingDart
+          key={dart.id}
+          targetPosition={dart.position}
+          modelPath={dart.modelPath}
+        />
+      ))}
+
+      {stuckDarts.map((dart) => (
+        <StuckDart
+          key={dart.id}
+          position={dart.position}
+          modelPath={dart.modelPath}
+        />
+      ))}
     </>
   );
 }

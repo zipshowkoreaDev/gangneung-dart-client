@@ -1,3 +1,5 @@
+import { stripDisplayName } from "@/lib/displayName";
+
 interface ResultScreenProps {
   name: string;
   score: number;
@@ -18,6 +20,7 @@ export default function ResultScreen({
   countdown,
   serverResult,
 }: ResultScreenProps) {
+  const displayName = stripDisplayName(name);
   const resultLabel =
     serverResult?.result === "win"
       ? "승리"
@@ -35,7 +38,7 @@ export default function ResultScreen({
 
       <div className="w-full max-w-[320px] bg-white/10 rounded-3xl border border-white/20 p-8 backdrop-blur-sm">
         <div className="text-center text-white/70 text-lg mb-2">
-          {name}
+          {displayName}
         </div>
         <div className="text-center">
           <span className="text-6xl font-bold text-[#FFD700]">{score}점</span>

@@ -17,6 +17,7 @@ import {
 } from "@/lib/score";
 import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import type { PlayerScore } from "@/app/display/types";
+import { stripDisplayName } from "@/lib/displayName";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
 const QUEUE_STATUS_INTERVAL_MS = 5000;
@@ -73,11 +74,6 @@ function getPlayerSocketIds(players?: Array<{ socketId?: string }>): string[] {
       ?.map((player) => player.socketId)
       .filter((socketId): socketId is string => Boolean(socketId)) ?? []
   );
-}
-
-function stripDisplayName(name: string) {
-  const [base] = name.split("#");
-  return base || name;
 }
 
 export function useDisplaySocket({
@@ -152,6 +148,52 @@ export function useDisplaySocket({
         .forEach((alias) => {
           playerAliasKeyRef.current.set(alias as string, key);
         });
+    };
+    const getExistingPlayerEntry = (
+      playersMap: Map<string, PlayerScore>,
+      key: string,
+      data: {
+        name?: string;
+        socketId?: string;
+      }
+    ): [string, PlayerScore] | undefined => {
+      const displayName = data.name ? stripDisplayName(data.name) : undefined;
+      const queueKey = data.socketId ? getQueuePlayerKey(data.socketId) : undefined;
+      const candidates = [key, queueKey].filter(Boolean) as string[];
+
+      for (const candidate of candidates) {
+        const player = playersMap.get(candidate);
+        if (player) return [candidate, player];
+      }
+
+      return Array.from(playersMap.entries()).find(
+        ([, player]) =>
+          (data.socketId && player.socketId === data.socketId) ||
+          (data.name && player.serverName === data.name) ||
+          (displayName && player.name === displayName)
+      );
+    };
+    const removeDuplicateWaitingPlayers = (
+      playersMap: Map<string, PlayerScore>,
+      keepKey: string,
+      socketId?: string
+    ) => {
+      if (!socketId) return;
+
+      const queueKey = getQueuePlayerKey(socketId);
+      if (queueKey !== keepKey) {
+        playersMap.delete(queueKey);
+      }
+
+      Array.from(playersMap.entries()).forEach(([entryKey, player]) => {
+        if (
+          entryKey !== keepKey &&
+          player.isWaiting &&
+          player.socketId === socketId
+        ) {
+          playersMap.delete(entryKey);
+        }
+      });
     };
 
     const logPlayerCount = (
@@ -340,6 +382,7 @@ export function useDisplaySocket({
       if (!playersRef.current.has(key)) {
         const displayName = data.name ? stripDisplayName(data.name) : key;
         const nextPlayers = new Map(playersRef.current);
+        removeDuplicateWaitingPlayers(nextPlayers, key, data.socketId);
         nextPlayers.set(key, {
           socketId: data.socketId,
           serverName: data.name,
@@ -434,6 +477,7 @@ export function useDisplaySocket({
       const slot = data.slot ?? getQueuedSocketSlot(data.socketId);
       const isRegistration = data.registration === true;
       const startsNewGame = isRegistration ? resetAggregationForNewGame() : false;
+      window.dispatchEvent(new CustomEvent("GAME_STARTED"));
 
       if (key) {
         if (startsNewGame) {
@@ -442,13 +486,18 @@ export function useDisplaySocket({
         }
         let shouldUpdateAim = !isRegistration;
         let addedPlayer = false;
+        let movedPlayerKey = false;
 
         setPlayers((prev) => {
           const next = startsNewGame ? new Map<string, PlayerScore>() : new Map(prev);
-          if (isRegistration && data.socketId) {
-            next.delete(getQueuePlayerKey(data.socketId));
+          const existingEntry = getExistingPlayerEntry(next, key, data);
+          const existingKey = existingEntry?.[0];
+          const existing = existingEntry?.[1];
+          if (existingKey && existingKey !== key) {
+            next.delete(existingKey);
+            movedPlayerKey = true;
           }
-          const existing = next.get(key);
+          removeDuplicateWaitingPlayers(next, key, data.socketId);
 
           if (existing) {
             if (isRegistration) {
@@ -522,10 +571,17 @@ export function useDisplaySocket({
           return next;
         });
 
-        if (addedPlayer) {
+        if (addedPlayer || movedPlayerKey) {
           setPlayerOrder((prev) => {
             if (prev.includes(key)) return prev;
-            return [...prev, key];
+            const previousKeys = [data.socketId, data.playerId, data.name]
+              .map((alias) => (alias ? playerAliasKeyRef.current.get(alias) : undefined))
+              .filter(Boolean) as string[];
+            const filtered = prev.filter(
+              (playerKey) => playerKey !== getQueuePlayerKey(data.socketId ?? "") &&
+                !previousKeys.includes(playerKey)
+            );
+            return [...filtered, key];
           });
         }
 
@@ -666,15 +722,23 @@ export function useDisplaySocket({
       const gameId = `${data.room}:${gameIdRef.current}`;
       onPlayersFinishRef.current?.(
         data.ranking.map((player) => ({
-          name: player.name,
+          name: stripDisplayName(player.name),
           score: player.score,
         })),
         gameId
       );
+      const displayRanking = data.ranking.map((player) => ({
+        ...player,
+        name: stripDisplayName(player.name),
+      }));
       window.setTimeout(() => {
         socket.emit("disconnect-room", { room: data.room });
       }, GAME_END_CLOSE_DELAY_MS);
-      window.dispatchEvent(new CustomEvent("GAME_FINISHED", { detail: data }));
+      window.dispatchEvent(
+        new CustomEvent("GAME_FINISHED", {
+          detail: { ...data, ranking: displayRanking },
+        })
+      );
     };
 
     const onGameStarted = (data: { players?: string[] }) => {
