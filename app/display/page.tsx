@@ -16,6 +16,7 @@ const DisplayQRCode = dynamic(() => import("./components/DisplayQRCode"), {
 import DartCanvas from "./components/DartCanvas";
 
 const ROOM = process.env.NEXT_PUBLIC_ROOM ?? "zipshow";
+const GAME_END_COUNTDOWN_SECONDS = 5;
 
 type FinishedPlayer = {
   name: string;
@@ -71,7 +72,7 @@ export default function DisplayPage() {
         setWinners([]);
       }
       setIsGameActive(true);
-      setEndCountdown(10);
+      setEndCountdown(GAME_END_COUNTDOWN_SECONDS);
     };
 
     window.addEventListener("DART_THROW", handleDartThrow);

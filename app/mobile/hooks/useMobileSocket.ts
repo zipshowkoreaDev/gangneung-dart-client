@@ -9,6 +9,11 @@ interface UseMobileSocketProps {
   enabled: boolean;
   slot: PlayerSlot | null;
   onPlayerFinished?: (playerId: string) => void;
+  onPlayerScored?: (player: {
+    socketId: string;
+    name: string;
+    score: number;
+  }) => void;
 }
 
 export function useMobileSocket({
@@ -17,6 +22,7 @@ export function useMobileSocket({
   enabled,
   slot,
   onPlayerFinished,
+  onPlayerScored,
 }: UseMobileSocketProps) {
   const throwCountRef = useRef(0);
   const hasJoinedRef = useRef(false);
@@ -27,6 +33,10 @@ export function useMobileSocket({
   useEffect(() => {
     onPlayerFinishedRef.current = onPlayerFinished;
   }, [onPlayerFinished]);
+  const onPlayerScoredRef = useRef(onPlayerScored);
+  useEffect(() => {
+    onPlayerScoredRef.current = onPlayerScored;
+  }, [onPlayerScored]);
 
   // enabled가 true로 바뀔 때(재입장 포함)에도 slotRef를 동기화
   useEffect(() => {
@@ -85,6 +95,20 @@ export function useMobileSocket({
       debugLog(`[Socket] player finished: ${playerId}`);
       onPlayerFinishedRef.current?.(playerId);
     };
+    const handleDartThrown = (data: {
+      socketId?: string;
+      playerId?: string;
+      name?: string;
+      score?: number;
+    }) => {
+      const playerId = data.socketId || data.playerId || data.name;
+      if (!playerId || typeof data.score !== "number") return;
+      onPlayerScoredRef.current?.({
+        socketId: playerId,
+        name: data.name ?? playerId,
+        score: data.score,
+      });
+    };
 
     const handleDisconnect = () => {
       debugLog("[Socket] disconnected");
@@ -96,6 +120,7 @@ export function useMobileSocket({
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("aim-off", handleAimOff);
+    socket.on("dart-thrown", handleDartThrown);
 
     if (socket.connected && !hasJoinedRef.current) {
       handleConnect();
@@ -105,6 +130,7 @@ export function useMobileSocket({
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("aim-off", handleAimOff);
+      socket.off("dart-thrown", handleDartThrown);
     };
   }, [room, name, enabled, slot]);
 

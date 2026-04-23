@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useMobileSocket } from "./hooks/useMobileSocket";
 import { useGyroscope } from "./hooks/useGyroscope";
 import { getQRSession } from "@/lib/session";
@@ -20,6 +20,13 @@ import GameScreen from "./components/GameScreen";
 import ResultScreen from "./components/ResultScreen";
 import WaitingScreen from "./components/WaitingScreen";
 import QueueLoading from "./components/QueueLoading";
+
+type ScoreEntry = {
+  socketId: string;
+  name: string;
+  score: number;
+};
+const GAME_END_COUNTDOWN_SECONDS = 5;
 
 export default function MobilePage() {
   const [sessionValid] = useState<boolean | null>(() =>
@@ -42,16 +49,32 @@ export default function MobilePage() {
   const [finishedPlayers, setFinishedPlayers] = useState<Set<string>>(
     () => new Set(),
   );
+  const [playerScores, setPlayerScores] = useState<Map<string, ScoreEntry>>(
+    () => new Map(),
+  );
   const [endCountdown, setEndCountdown] = useState<number | null>(null);
   const [canJoinCurrentGame, setCanJoinCurrentGame] = useState<boolean | null>(
     null,
   );
+  const finishGameEmittedRef = useRef(false);
 
   const handlePlayerFinished = useCallback((playerId: string) => {
     setFinishedPlayers((prev) => {
       if (prev.has(playerId)) return prev;
       const next = new Set(prev);
       next.add(playerId);
+      return next;
+    });
+  }, []);
+  const handlePlayerScored = useCallback((player: ScoreEntry) => {
+    setPlayerScores((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(player.socketId);
+      next.set(player.socketId, {
+        socketId: player.socketId,
+        name: player.name,
+        score: (existing?.score ?? 0) + player.score,
+      });
       return next;
     });
   }, []);
@@ -63,6 +86,7 @@ export default function MobilePage() {
       enabled: hasJoined,
       slot: assignedSlot,
       onPlayerFinished: handlePlayerFinished,
+      onPlayerScored: handlePlayerScored,
     });
 
   const {
@@ -191,12 +215,20 @@ export default function MobilePage() {
 
   useEffect(() => {
     if (!socketId || !hasFinishedTurn) return;
-    const timerId = window.setTimeout(
-      () => handlePlayerFinished(socketId),
-      TURN_RESULT_DELAY_MS,
-    );
+    const timerId = window.setTimeout(() => {
+      setPlayerScores((prev) => {
+        const next = new Map(prev);
+        next.set(socketId, {
+          socketId,
+          name: socketName,
+          score: totalScore,
+        });
+        return next;
+      });
+      handlePlayerFinished(socketId);
+    }, TURN_RESULT_DELAY_MS);
     return () => window.clearTimeout(timerId);
-  }, [socketId, hasFinishedTurn, handlePlayerFinished]);
+  }, [socketId, socketName, hasFinishedTurn, totalScore, handlePlayerFinished]);
 
   useEffect(() => {
     if (!myTurn || sensorsReady) return;
@@ -205,9 +237,29 @@ export default function MobilePage() {
 
   useEffect(() => {
     if (!gameFinished || endCountdown !== null) return;
-    const timer = window.setTimeout(() => setEndCountdown(10), 0);
+    const timer = window.setTimeout(
+      () => setEndCountdown(GAME_END_COUNTDOWN_SECONDS),
+      0,
+    );
     return () => window.clearTimeout(timer);
   }, [gameFinished, endCountdown]);
+
+  useEffect(() => {
+    if (!gameFinished || finishGameEmittedRef.current) return;
+    if (!socketId || gamePlayers[0] !== socketId) return;
+
+    const scores = gamePlayers.map((playerId) => {
+      const entry = playerScores.get(playerId);
+      return {
+        socketId: playerId,
+        name: entry?.name ?? playerId,
+        score: entry?.score ?? 0,
+      };
+    });
+
+    finishGameEmittedRef.current = true;
+    socket.emit("finish-game", { room, scores });
+  }, [gameFinished, gamePlayers, playerScores, room, socketId]);
 
   useEffect(() => {
     if (endCountdown === null) return;
@@ -216,6 +268,8 @@ export default function MobilePage() {
         handleExit();
         setGamePlayers([]);
         setFinishedPlayers(new Set());
+        setPlayerScores(new Map());
+        finishGameEmittedRef.current = false;
         setEndCountdown(null);
       }, 0);
       return () => window.clearTimeout(timer);

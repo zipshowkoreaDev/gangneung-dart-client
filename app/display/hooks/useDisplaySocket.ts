@@ -3,7 +3,6 @@ import {
   useRef,
   Dispatch,
   SetStateAction,
-  useCallback,
 } from "react";
 import { socket } from "@/shared/socket";
 import {
@@ -20,8 +19,8 @@ import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import type { PlayerScore } from "@/app/display/types";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
-const QUEUE_STATUS_INTERVAL_MS = 1000;
-const GAME_END_CLOSE_DELAY_MS = 5000;
+const QUEUE_STATUS_INTERVAL_MS = 5000;
+const GAME_END_CLOSE_DELAY_MS = 5_000;
 
 interface UseDisplaySocketProps {
   room: string;
@@ -68,42 +67,17 @@ function getQueuePlayerKey(socketId: string) {
   return `queue-${socketId}`;
 }
 
+function getPlayerSocketIds(players?: Array<{ socketId?: string }>): string[] {
+  return (
+    players
+      ?.map((player) => player.socketId)
+      .filter((socketId): socketId is string => Boolean(socketId)) ?? []
+  );
+}
+
 function stripDisplayName(name: string) {
   const [base] = name.split("#");
   return base || name;
-}
-
-function buildRanking(players: PlayerScore[]) {
-  return [...players]
-    .sort((a, b) => b.score - a.score)
-    .map((player, index) => ({
-      name: player.name,
-      score: player.score,
-      rank: index + 1,
-    }));
-}
-
-function getFinishedGamePlayers(
-  players: Map<string, PlayerScore>,
-  expectedPlayerCount: number
-) {
-  const slotPlayers = Array.from(players.values()).filter(
-    (player) => player.slot
-  );
-
-  if (
-    slotPlayers.length === 0 ||
-    slotPlayers.length < expectedPlayerCount ||
-    slotPlayers.some((player) => player.totalThrows < 3)
-  ) {
-    return null;
-  }
-
-  return slotPlayers.sort(
-    (a, b) =>
-      (a.slot ?? Number.MAX_SAFE_INTEGER) -
-      (b.slot ?? Number.MAX_SAFE_INTEGER)
-  );
 }
 
 export function useDisplaySocket({
@@ -117,12 +91,11 @@ export function useDisplaySocket({
 }: UseDisplaySocketProps) {
   const playersRef = useRef(players);
   const onPlayersFinishRef = useRef(onPlayersFinish);
-  const gameFinishedEmittedRef = useRef(false);
+  const gameFinishedHandledRef = useRef(false);
   const gameIdRef = useRef(0);
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
   const playerAliasKeyRef = useRef<Map<string, string>>(new Map());
   const queuedPlayerIdsRef = useRef<string[]>([]);
-  const expectedGamePlayerCountRef = useRef(0);
 
   // React state 비동기 반영 경쟁 조건 방지: 마지막 점수를 ref로 동기 추적
   const playerLastScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
@@ -134,20 +107,6 @@ export function useDisplaySocket({
   useEffect(() => {
     onPlayersFinishRef.current = onPlayersFinish;
   }, [onPlayersFinish]);
-
-  const emitFinishGame = useCallback(
-    (targetRoom: string, finishedPlayers: PlayerScore[]) => {
-      socket.emit("finish-game", {
-        room: targetRoom,
-        scores: finishedPlayers.map((player) => ({
-          socketId: player.socketId ?? player.serverName ?? player.name,
-          name: player.name,
-          score: player.score,
-        })),
-      });
-    },
-    []
-  );
 
   useEffect(() => {
     if (!room) return;
@@ -219,14 +178,13 @@ export function useDisplaySocket({
         (player) => player.slot
       );
 
-      if (!hasRegisteredPlayers || gameFinishedEmittedRef.current) {
-            gameIdRef.current += 1;
-            playerLastScoresRef.current.clear();
-            finishedPlayerKeysRef.current.clear();
-            playerAliasKeyRef.current.clear();
-            expectedGamePlayerCountRef.current = queuedPlayerIdsRef.current.length;
-            gameFinishedEmittedRef.current = false;
-            return true;
+      if (!hasRegisteredPlayers || gameFinishedHandledRef.current) {
+        gameIdRef.current += 1;
+        playerLastScoresRef.current.clear();
+        finishedPlayerKeysRef.current.clear();
+        playerAliasKeyRef.current.clear();
+        gameFinishedHandledRef.current = false;
+        return true;
       }
 
       return false;
@@ -240,8 +198,76 @@ export function useDisplaySocket({
       onLog?.(`Client info: ${data.socketId}, ${data.name}, ${data.room}`);
     };
 
-    const onJoinedRoom = (data: { room: string; playerCount: number }) => {
+    const onJoinedRoom = (data: {
+      room: string;
+      playerCount: number;
+      players?: Array<{ socketId: string; name: string }>;
+    }) => {
+      if (!isRoomEvent(data.room)) return;
       logPlayerCount("Room joined", data);
+
+      const joinedSocketIds = getPlayerSocketIds(data.players);
+      if (joinedSocketIds.length > 0) {
+        queuedPlayerIdsRef.current = Array.from(
+          new Set([...queuedPlayerIdsRef.current, ...joinedSocketIds])
+        ).slice(0, MAX_PLAYERS);
+      }
+
+      setPlayers((prev) => {
+        const next = new Map(prev);
+        const joinedSocketIdSet = new Set(joinedSocketIds);
+
+        if (joinedSocketIdSet.size > 0) {
+          Array.from(next.entries()).forEach(([key, player]) => {
+            if (
+              player.isWaiting &&
+              player.socketId &&
+              !joinedSocketIdSet.has(player.socketId)
+            ) {
+              next.delete(key);
+            }
+          });
+        }
+
+        data.players?.forEach((joinedPlayer) => {
+          if (!joinedPlayer.socketId) return;
+
+          const displayName = stripDisplayName(joinedPlayer.name);
+          const existingEntry =
+            Array.from(next.entries()).find(
+              ([, player]) =>
+                player.socketId === joinedPlayer.socketId ||
+                player.serverName === joinedPlayer.name ||
+                player.name === displayName
+            ) ?? [getQueuePlayerKey(joinedPlayer.socketId), undefined];
+          const [key, existing] = existingEntry;
+          const slot =
+            existing?.slot ?? getQueuedSocketSlot(joinedPlayer.socketId);
+          rememberPlayerAliases(key, {
+            socketId: joinedPlayer.socketId,
+            name: joinedPlayer.name,
+          });
+
+          next.set(key, {
+            socketId: joinedPlayer.socketId,
+            serverName: joinedPlayer.name,
+            slot,
+            name: displayName,
+            score: existing?.score ?? 0,
+            isConnected: true,
+            isReady: existing?.isReady ?? false,
+            isWaiting: existing?.isWaiting ?? true,
+            totalThrows: existing?.totalThrows ?? 0,
+            currentThrows: existing?.currentThrows ?? 0,
+            throwScores: existing?.throwScores ?? [],
+            dartDeadlineEndsAt: existing?.dartDeadlineEndsAt,
+            turnDelayEndsAt: existing?.turnDelayEndsAt,
+          });
+        });
+
+        playersRef.current = next;
+        return next;
+      });
     };
 
     const onRoomPlayerCount = (data: { room: string; playerCount: number }) => {
@@ -312,8 +338,26 @@ export function useDisplaySocket({
         return;
       }
       if (!playersRef.current.has(key)) {
-        onLog?.(`Ignored dart from unknown player ${key}`);
-        return;
+        const displayName = data.name ? stripDisplayName(data.name) : key;
+        const nextPlayers = new Map(playersRef.current);
+        nextPlayers.set(key, {
+          socketId: data.socketId,
+          serverName: data.name,
+          slot: data.slot ?? getQueuedSocketSlot(data.socketId),
+          name: displayName,
+          score: 0,
+          isConnected: true,
+          isReady: true,
+          isWaiting: false,
+          totalThrows: 0,
+          currentThrows: 0,
+          throwScores: [],
+          dartDeadlineEndsAt: Date.now() + DART_TIME_LIMIT_MS,
+          turnDelayEndsAt: undefined,
+        });
+        playersRef.current = nextPlayers;
+        setPlayers(nextPlayers);
+        setPlayerOrder((prev) => (prev.includes(key) ? prev : [...prev, key]));
       }
 
       const score =
@@ -561,45 +605,11 @@ export function useDisplaySocket({
         playersRef.current = nextPlayers;
         setPlayers(nextPlayers);
 
-        const finishedPlayers = getFinishedGamePlayers(
-          nextPlayers,
-          expectedGamePlayerCountRef.current
-        );
-
         window.setTimeout(() => {
           window.dispatchEvent(
             new CustomEvent("CLEAR_PLAYER_DARTS", { detail: { key } })
           );
         }, TURN_RESULT_DELAY_MS);
-
-        if (
-          data.room &&
-          finishedPlayers &&
-          !gameFinishedEmittedRef.current
-        ) {
-          const gameId = `${room}:${gameIdRef.current}`;
-          const ranking = buildRanking(finishedPlayers);
-          gameFinishedEmittedRef.current = true;
-          onPlayersFinishRef.current?.(
-            finishedPlayers.map((player) => ({
-              name: player.name,
-              score: player.score,
-            })),
-            gameId
-          );
-          emitFinishGame(data.room, finishedPlayers);
-          window.setTimeout(() => {
-            socket.emit("disconnect-room", { room: data.room });
-          }, GAME_END_CLOSE_DELAY_MS);
-          window.dispatchEvent(
-            new CustomEvent("GAME_FINISHED", {
-              detail: {
-                room: data.room,
-                ranking,
-              },
-            })
-          );
-        }
       }
     };
 
@@ -632,8 +642,6 @@ export function useDisplaySocket({
           `Rank ${player.rank}: ${player.name} - ${player.score}점 (socketId: ${player.socketId})`
         );
       });
-
-      window.dispatchEvent(new CustomEvent("GAME_RESULT", { detail: data }));
     };
 
     const onGameFinished = (data: {
@@ -644,6 +652,10 @@ export function useDisplaySocket({
         rank: number;
       }>;
     }) => {
+      if (!isRoomEvent(data.room)) return;
+      if (gameFinishedHandledRef.current) return;
+      gameFinishedHandledRef.current = true;
+
       onLog?.(`Game finished in room: ${data.room}`);
       onLog?.(`Final ranking:`);
 
@@ -651,14 +663,25 @@ export function useDisplaySocket({
         onLog?.(`  ${player.rank}위: ${player.name} - ${player.score}점`);
       });
 
+      const gameId = `${data.room}:${gameIdRef.current}`;
+      onPlayersFinishRef.current?.(
+        data.ranking.map((player) => ({
+          name: player.name,
+          score: player.score,
+        })),
+        gameId
+      );
+      window.setTimeout(() => {
+        socket.emit("disconnect-room", { room: data.room });
+      }, GAME_END_CLOSE_DELAY_MS);
       window.dispatchEvent(new CustomEvent("GAME_FINISHED", { detail: data }));
     };
 
     const onGameStarted = (data: { players?: string[] }) => {
       if (Array.isArray(data.players)) {
         const uniquePlayers = Array.from(new Set(data.players)).filter(Boolean);
-        expectedGamePlayerCountRef.current = uniquePlayers.length;
         queuedPlayerIdsRef.current = uniquePlayers;
+        gameFinishedHandledRef.current = false;
         onLog?.(`Game started with expected players: ${uniquePlayers.length}`);
       }
     };
@@ -668,8 +691,7 @@ export function useDisplaySocket({
       playerAliasKeyRef.current.clear();
       finishedPlayerKeysRef.current.clear();
       queuedPlayerIdsRef.current = [];
-      expectedGamePlayerCountRef.current = 0;
-      gameFinishedEmittedRef.current = false;
+      gameFinishedHandledRef.current = false;
       window.dispatchEvent(new CustomEvent("RESET_SCENE"));
     };
 
@@ -678,8 +700,7 @@ export function useDisplaySocket({
       playerAliasKeyRef.current.clear();
       finishedPlayerKeysRef.current.clear();
       queuedPlayerIdsRef.current = [];
-      expectedGamePlayerCountRef.current = 0;
-      gameFinishedEmittedRef.current = false;
+      gameFinishedHandledRef.current = false;
     };
 
     socket.on("connect", onConnect);
@@ -723,7 +744,6 @@ export function useDisplaySocket({
     setAimPositions,
     setPlayers,
     setPlayerOrder,
-    emitFinishGame,
   ]);
 
   return {};
