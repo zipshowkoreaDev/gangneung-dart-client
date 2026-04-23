@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { socket } from "@/shared/socket";
 import type { PlayerSlot } from "@/lib/room";
 import { debugLog } from "@/app/mobile/debugLog";
@@ -46,6 +46,12 @@ export function useMobileSocket({
   const currentRoomRef = useRef<string>("");
   const slotRef = useRef<PlayerSlot | null>(null);
   const gameEndedRef = useRef(false);
+  const [currentSocketId, setCurrentSocketId] = useState<string | undefined>(
+    () => socket.id,
+  );
+  const syncCurrentSocketId = useCallback(() => {
+    setCurrentSocketId(socket.id);
+  }, []);
 
   const onPlayerFinishedRef = useRef(onPlayerFinished);
   useEffect(() => {
@@ -110,6 +116,7 @@ export function useMobileSocket({
     const joinPlayerRoom = () => {
       if (gameEndedRef.current) return;
       if (hasJoinedRef.current && currentRoomRef.current === room) return;
+      syncCurrentSocketId();
       debugLog(`[Socket] joinRoom: ${room}, name: ${name}`);
       socket.emit("joinRoom", { room, name });
       emitRegistration();
@@ -123,6 +130,7 @@ export function useMobileSocket({
 
     const handleConnect = () => {
       debugLog("[Socket] connected");
+      syncCurrentSocketId();
       joinPlayerRoom();
     };
 
@@ -219,6 +227,7 @@ export function useMobileSocket({
       hasJoinedRef.current = false;
       currentRoomRef.current = "";
       throwCountRef.current = 0;
+      setCurrentSocketId(undefined);
     };
 
     socket.on("connect", handleConnect);
@@ -233,6 +242,10 @@ export function useMobileSocket({
 
     if (socket.connected && !hasJoinedRef.current) {
       handleConnect();
+    } else if (socket.connected) {
+      registrationTimerIds.push(
+        window.setTimeout(syncCurrentSocketId, 0)
+      );
     }
 
     return () => {
@@ -247,7 +260,7 @@ export function useMobileSocket({
       socket.off("joinedRoom", handleJoinedRoom);
       socket.off("roomPlayerCount", handleRoomPlayerCount);
     };
-  }, [room, name, enabled, slot]);
+  }, [room, name, enabled, slot, syncCurrentSocketId]);
 
   const leaveJoinedRooms = useCallback((reason: string) => {
     if (!socket.connected) return;
@@ -359,6 +372,6 @@ export function useMobileSocket({
     emitAimOff,
     cleanupGameSocket,
     leaveGame,
-    socketId: socket.id,
+    socketId: currentSocketId,
   };
 }
