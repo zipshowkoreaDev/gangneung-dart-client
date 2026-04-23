@@ -11,6 +11,7 @@ import { debugLog } from "@/app/mobile/debugLog";
 
 const QUEUE_TIMEOUT_MS = 2 * 60 * 1000;
 const HOST_APPROVAL_TIMEOUT_MS = 30 * 1000;
+const STALE_HOST_RECOVERY_MS = HOST_APPROVAL_TIMEOUT_MS + 5 * 1000;
 const GAME_STARTED_EVENT = "game-started";
 const START_GAME_EVENT = "start-game";
 
@@ -58,6 +59,8 @@ export function useQueue({
   const startRequestedRef = useRef(false);
   const queueSnapshotRef = useRef<string[]>([]);
   const hostApprovalDeadlineRef = useRef<number | null>(null);
+  const staleHostRecoveryDeadlineRef = useRef<number | null>(null);
+  const staleHostRecoveryRequestedRef = useRef(false);
 
   const clearApprovalWait = useCallback(() => {
     setIsWaitingForApproval(false);
@@ -65,6 +68,7 @@ export function useQueue({
     setCanStartGame(false);
     setHostApprovalTimeLeft(null);
     hostApprovalDeadlineRef.current = null;
+    staleHostRecoveryDeadlineRef.current = null;
   }, []);
 
   const leaveQueue = useCallback(() => {
@@ -82,6 +86,8 @@ export function useQueue({
     setHostApprovalTimeLeft(null);
     queueStartAtRef.current = null;
     hostApprovalDeadlineRef.current = null;
+    staleHostRecoveryDeadlineRef.current = null;
+    staleHostRecoveryRequestedRef.current = false;
     startRequestedRef.current = false;
     clearApprovalWait();
   }, [clearApprovalWait]);
@@ -153,6 +159,33 @@ export function useQueue({
       onEnterGame(slot, players);
     };
 
+    const recoverStaleHostQueue = () => {
+      if (staleHostRecoveryRequestedRef.current || !socket.connected) return;
+
+      staleHostRecoveryRequestedRef.current = true;
+      staleHostRecoveryDeadlineRef.current = null;
+      debugLog("[Queue] stale host detected - reset queue and rejoin");
+      socket.emit("leave-queue");
+      socket.emit("reset-queue", { project: "dart" });
+      joinedQueueRef.current = false;
+      lastJoinedSocketIdRef.current = null;
+
+      window.setTimeout(() => {
+        if (!socket.connected || !isInQueue || isInGame) {
+          staleHostRecoveryRequestedRef.current = false;
+          return;
+        }
+        debugLog("[Queue] stale host recovery join-queue emit");
+        socket.emit("join-queue");
+        joinedQueueRef.current = true;
+        if (socket.id) {
+          lastJoinedSocketIdRef.current = socket.id;
+        }
+        socket.emit("status-queue");
+        staleHostRecoveryRequestedRef.current = false;
+      }, 300);
+    };
+
     const onStatusQueue = (queue: string[]) => {
       const uniqueQueue = Array.from(new Set(queue));
       debugLog(`[Queue] status-queue: ${JSON.stringify(uniqueQueue)}`);
@@ -164,9 +197,6 @@ export function useQueue({
       setQueuePosition(position);
 
       if (position < 0 && joinedQueueRef.current) {
-        if (socket.id && lastJoinedSocketIdRef.current === socket.id) {
-          return;
-        }
         const now = Date.now();
         if (now - lastRejoinAtRef.current > 5000) {
           lastRejoinAtRef.current = now;
@@ -178,6 +208,7 @@ export function useQueue({
             lastJoinedSocketIdRef.current = socket.id;
           }
         }
+        staleHostRecoveryDeadlineRef.current = null;
       }
 
       const slot = getSlotFromPosition(position);
@@ -189,6 +220,7 @@ export function useQueue({
         if (host && !startRequestedRef.current) {
           hostApprovalDeadlineRef.current ??=
             Date.now() + HOST_APPROVAL_TIMEOUT_MS;
+          staleHostRecoveryDeadlineRef.current = null;
           setHostApprovalTimeLeft(
             Math.max(
               0,
@@ -200,6 +232,12 @@ export function useQueue({
         } else {
           hostApprovalDeadlineRef.current = null;
           setHostApprovalTimeLeft(null);
+          if (position > 0) {
+            staleHostRecoveryDeadlineRef.current ??=
+              Date.now() + STALE_HOST_RECOVERY_MS;
+          } else {
+            staleHostRecoveryDeadlineRef.current = null;
+          }
         }
 
         if (host && startRequestedRef.current) {
@@ -294,6 +332,24 @@ export function useQueue({
 
     const hostApprovalTimerId = window.setInterval(() => {
       const deadline = hostApprovalDeadlineRef.current;
+      const staleDeadline = staleHostRecoveryDeadlineRef.current;
+
+      if (
+        staleDeadline &&
+        joinedQueueRef.current &&
+        !startRequestedRef.current &&
+        Date.now() >= staleDeadline
+      ) {
+        const position = socket.id
+          ? queueSnapshotRef.current.indexOf(socket.id)
+          : -1;
+        if (position > 0 && position < MAX_PLAYERS) {
+          recoverStaleHostQueue();
+          return;
+        }
+        staleHostRecoveryDeadlineRef.current = null;
+      }
+
       if (!deadline || !joinedQueueRef.current || startRequestedRef.current) {
         return;
       }
