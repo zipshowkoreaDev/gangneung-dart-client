@@ -7,11 +7,8 @@ import * as THREE from "three";
 import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
 const DART_MODEL_SCALE = 24;
-const DART_MODEL_ROTATION: [number, number, number] = [
-  Math.PI / 2,
-  0,
-  0,
-];
+const ROULETTE_MODEL_SCALE = 1.4;
+const DART_MODEL_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
 const DART_MODEL_PATHS = [
   "/models/dart_blue.glb",
   "/models/dart_red.glb",
@@ -134,11 +131,12 @@ function Roulette({
   useEffect(() => {
     const box = new THREE.Box3().setFromObject(rouletteScene);
     const size = box.getSize(new THREE.Vector3());
-    cachedRouletteRadius = Math.max(size.x, size.y) / 2;
+    cachedRouletteRadius =
+      (Math.max(size.x, size.y) / 2) * ROULETTE_MODEL_SCALE;
   }, [rouletteScene]);
 
   return (
-    <group>
+    <group scale={ROULETTE_MODEL_SCALE}>
       <primitive object={rouletteScene} rotation={[0, -Math.PI / 2, 0]} />
 
       {flyingDarts.map((dart) => (
@@ -187,7 +185,10 @@ function DartEventHandler({
 
       const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -1);
       const intersectPoint = new THREE.Vector3();
-      const hasIntersection = raycaster.ray.intersectPlane(plane, intersectPoint);
+      const hasIntersection = raycaster.ray.intersectPlane(
+        plane,
+        intersectPoint,
+      );
       if (!hasIntersection) return;
 
       const ownerKey = data.playerId || data.name || data.socketId || "player";
