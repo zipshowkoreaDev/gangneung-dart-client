@@ -521,8 +521,8 @@
         <h2>개요</h2>
         <p class="desc" style="margin-bottom:6px">
           Display는 <b>게임 화면(관전자 뷰)</b>입니다. 주 역할은 <span class="pill listen">LISTEN</span> —
-          컨트롤러가 보낸 조준·다트·게임 결과 이벤트를 받아 화면에 렌더링합니다.
-          제어용으로 <span class="pill emit">EMIT</span> 몇 가지를 발행할 수 있습니다.
+          큐 상태와 게임 세션 이벤트를 받아 화면에 렌더링하는 것입니다.
+          정상 게임 플로우에서는 방 제어보다 <b>수동 구독자(observer)</b> 역할에 집중합니다.
         </p>
 
         <h3 style="margin-top:14px">연결 정보</h3>
@@ -552,10 +552,15 @@ socket.on('dart-thrown', (d) =&gt; renderDart(d.name, d.aim, d.score));
 socket.on('game-finished', (d) =&gt; renderRanking(d.ranking));</code></pre>
 
         <div class="hint">
-          Display는 <b>observer</b>로 동작할 수 있습니다.
-          Controller와 달리 <code class="inline">joinRoom</code>을 호출하지 않으면 방의
-          참가자 수(<code class="inline">playerCount</code>)에 포함되지 않습니다.
-          연결 쿼리의 <code class="inline">room</code> 하나로 브로드캐스트만 받도록 구성하세요.
+          권장 구조: Display는 <b>observer</b>로만 동작하고, 게임 종료 후에도 연결을 유지한 채
+          다음 <code class="inline">game-started</code>를 기다립니다.
+          Controller와 달리 <code class="inline">joinRoom</code>을 직접 호출해 세션을 제어하지 않습니다.
+        </div>
+        <div class="hint">
+          권장 이벤트 계층은 2단계입니다.
+          로비/큐 단계: <code class="inline">status-queue</code>로 대기 상태를 표시
+          게임 단계: <code class="inline">game-started</code> 이후 <code class="inline">aim-update</code>,
+          <code class="inline">dart-thrown</code>, <code class="inline">aim-off</code>, <code class="inline">game-finished</code>를 같은 세션으로 처리
         </div>
       </section>
 
@@ -627,6 +632,12 @@ socket.on('game-finished', (d) =&gt; renderRanking(d.ranking));</code></pre>
           <pre><code>{ room: string, ranking: Array&lt;{ name, score, rank }&gt; }</code></pre>
         </div>
 
+        <div class="event" id="listen-game-started">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>game-started</code></div>
+          <p class="desc">새 게임 세션 시작 알림. 이 이벤트를 받으면 이전 게임의 플레이어/조준/다트 UI를 초기화하고 새 세션 등록을 기다립니다.</p>
+          <pre><code>{ room?: string, players?: string[] }</code></pre>
+        </div>
+
         <div class="event" id="listen-status-queue">
           <div class="event-title"><span class="pill listen">LISTEN</span><code>status-queue</code></div>
           <p class="desc">대기열(큐)이 바뀔 때마다 모든 클라이언트에게 발행. 대기 순번 UI에 사용.</p>
@@ -642,7 +653,7 @@ socket.on('game-finished', (d) =&gt; renderRanking(d.ranking));</code></pre>
         <div class="event" id="emit-disconnect-room">
           <div class="event-title"><span class="pill emit">EMIT</span><code>disconnect-room</code></div>
           <p class="desc">해당 방의 <b>모든 소켓</b>(컨트롤러 + 디스플레이 + observer)을 강제 연결 해제.
-            게임 종료 후 <code class="inline">GAME_END_CLOSE_DELAY_MS</code>(5초) 대기 후 방 정리용으로 호출.</p>
+            관리자 수동 정리 용도입니다. <b>정상 게임 종료 플로우에서는 사용하지 않는 것을 권장</b>합니다.</p>
           <pre><code>// payload
 { room: string }
 
@@ -701,8 +712,8 @@ socket.on('status-queue', (queue) =&gt; renderQueue(queue));</code></pre>
           <button class="danger ghost" id="btn-disconnect" onclick="disconnect()" disabled>Disconnect</button>
         </div>
         <div class="hint" style="margin-top:10px">
-          Connect 시 <code class="inline">room</code> 쿼리로 자동 입장 — Display는
-          observer로 동작하므로 <code class="inline">joinRoom</code>을 호출하지 않습니다.
+          Connect 시 <code class="inline">room</code> 쿼리로 자동 입장합니다.
+          Display는 observer로 동작하며 연결을 유지한 채 큐와 게임 세션 이벤트를 계속 수신합니다.
         </div>
         <div style="font-size:12px; color:var(--muted); margin-top:6px">
           socketId: <code class="inline" id="sid">-</code>
@@ -755,6 +766,7 @@ socket.on('status-queue', (queue) =&gt; renderQueue(queue));</code></pre>
           <a href="#listen-dart-thrown">LISTEN · dart-thrown</a>
           <a href="#listen-game-result">LISTEN · game-result</a>
           <a href="#listen-game-finished">LISTEN · game-finished</a>
+          <a href="#listen-game-started">LISTEN · game-started</a>
           <a href="#listen-status-queue">LISTEN · status-queue</a>
           <a href="#emit-disconnect-room">EMIT · disconnect-room</a>
           <a href="#emit-reset-queue">EMIT · reset-queue</a>

@@ -471,7 +471,7 @@
         <p class="desc" style="margin-bottom:6px">
           Controller는 플레이어가 <b>다트를 던지고 조준하는 단말</b>입니다. 서버의 <code class="inline">dart</code>
           네임스페이스에 연결하여 <span class="pill emit">EMIT</span> 으로 액션을 보내고,
-          <span class="pill listen">LISTEN</span> 으로 방 상태·게임 결과를 받습니다.
+          <span class="pill listen">LISTEN</span> 으로 큐 상태와 게임 결과를 받습니다.
         </p>
 
         <h3 style="margin-top:14px">연결 정보</h3>
@@ -493,6 +493,12 @@ socket.on('connect', () =&gt; {
 
 socket.on('joinedRoom', (data) =&gt; console.log('joined', data));</code></pre>
 
+        <div class="hint">
+          권장 구조: Controller는 먼저 <b>큐 단계</b>에서 참가를 확정하고, 이후에만 <b>게임 단계</b> 이벤트를 보냅니다.
+          즉, <code class="inline">join-queue</code> / <code class="inline">status-queue</code> 로 로비를 처리하고,
+          <code class="inline">game-started</code> 이후에 <code class="inline">aim-update</code>,
+          <code class="inline">throw-dart</code>, <code class="inline">aim-off</code> 를 사용합니다.
+        </div>
         <div class="hint">
           <b>제한</b>: 방 이름 최대 64자, 이름 최대 32자, 방당 최대 4명. 초과 시
           <code class="inline">roomFull</code> 이벤트가 해당 클라이언트에게만 발행됩니다.
@@ -528,6 +534,11 @@ socket.emit('joinRoom', { room: 'room-1', name: 'Junn' });</code></pre>
               <span class="live-badge"><span class="ping"></span> 실시간 서버로 전송</span>
             </div>
           </div>
+        </div>
+
+        <div class="hint">
+          권장: <code class="inline">joinRoom</code>은 큐 입장과 분리해서 사용합니다.
+          큐에 들어갈 때는 <code class="inline">join-queue</code>, 실제 게임 세션 참가가 확정된 뒤에만 게임용 등록을 수행합니다.
         </div>
 
         <!-- aim-update -->
@@ -715,8 +726,14 @@ socket.on('status-queue', (queue) =&gt; console.log(queue));</code></pre>
         </div>
 
         <div class="event">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>game-started</code></div>
+          <p class="desc">새 게임 세션 시작 알림. 이 이벤트를 받으면 로비 상태를 종료하고 해당 플레이어 배열 기준으로 턴 UI를 준비합니다.</p>
+          <pre><code>{ room?: string, players?: string[] }</code></pre>
+        </div>
+
+        <div class="event">
           <div class="event-title"><span class="pill listen">LISTEN</span><code>status-queue</code></div>
-          <p class="desc">큐 변경(join/leave) 시 <b>모든 클라이언트</b>에게 브로드캐스트.</p>
+          <p class="desc">현재 구현에서는 큐 상태 확인과 큐 변경 반영에 모두 사용합니다. 권장 해석은 <b>로비 단계 전용 이벤트</b>입니다.</p>
           <pre><code>string[]   // socketId 배열</code></pre>
         </div>
       </section>
@@ -744,7 +761,8 @@ socket.on('status-queue', (queue) =&gt; console.log(queue));</code></pre>
         </div>
         <div class="hint" style="margin-top:10px">
           Connect 를 누르면 <code class="inline">room</code> 쿼리로 접속합니다.
-          이후 방 참가는 <code class="inline">joinRoom</code> 버튼으로 수행하세요.
+          이후 권장 플로우는 <code class="inline">join-queue</code> 로 로비에 참가하고,
+          <code class="inline">game-started</code> 이후에 게임용 이벤트를 전송하는 것입니다.
         </div>
         <div style="font-size:12px; color:var(--muted); margin-top:6px">
           socketId: <code class="inline" id="sid">-</code>

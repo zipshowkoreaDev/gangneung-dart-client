@@ -67,6 +67,14 @@ export default function MobilePage() {
   );
   const finishGameEmittedRef = useRef(false);
   const gameCleanupEmittedRef = useRef(false);
+  const resetRoundState = useCallback(() => {
+    setFinishedPlayers(new Set());
+    setPlayerScores(new Map());
+    setGameResult(null);
+    setEndCountdown(null);
+    finishGameEmittedRef.current = false;
+    gameCleanupEmittedRef.current = false;
+  }, []);
 
   const handlePlayerFinished = useCallback((playerId: string) => {
     setFinishedPlayers((prev) => {
@@ -99,12 +107,9 @@ export default function MobilePage() {
       setHasJoined(false);
       setAssignedSlot(null);
       setGamePlayers([]);
-      setFinishedPlayers(new Set());
-      setPlayerScores(new Map());
-      setGameResult(null);
-      finishGameEmittedRef.current = false;
+      resetRoundState();
     },
-    [],
+    [resetRoundState],
   );
   const handleRoomPlayersUpdated = useCallback(
     (data: {
@@ -177,6 +182,7 @@ export default function MobilePage() {
     room,
     name: socketName,
     isInGame,
+    resetRoundState,
     setAssignedSlot,
     setHasJoined,
     setIsInGame,
@@ -328,12 +334,7 @@ export default function MobilePage() {
       const timer = window.setTimeout(() => {
         handleExit();
         setGamePlayers([]);
-        setFinishedPlayers(new Set());
-        setPlayerScores(new Map());
-        setGameResult(null);
-        finishGameEmittedRef.current = false;
-        gameCleanupEmittedRef.current = false;
-        setEndCountdown(null);
+        resetRoundState();
       }, 0);
       return () => window.clearTimeout(timer);
     }
@@ -342,7 +343,7 @@ export default function MobilePage() {
       1000,
     );
     return () => window.clearTimeout(timer);
-  }, [endCountdown, handleExit]);
+  }, [endCountdown, handleExit, resetRoundState]);
 
   const handleNameChange = useCallback(
     (value: string) => {
