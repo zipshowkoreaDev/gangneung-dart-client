@@ -26,6 +26,12 @@ type ScoreEntry = {
   name: string;
   score: number;
 };
+type ControllerGameResult = {
+  result: "win" | "lose" | "tie";
+  score: number;
+  rank: number;
+  totalPlayers: number;
+};
 const GAME_END_COUNTDOWN_SECONDS = 5;
 
 export default function MobilePage() {
@@ -51,6 +57,9 @@ export default function MobilePage() {
   );
   const [playerScores, setPlayerScores] = useState<Map<string, ScoreEntry>>(
     () => new Map(),
+  );
+  const [gameResult, setGameResult] = useState<ControllerGameResult | null>(
+    null,
   );
   const [endCountdown, setEndCountdown] = useState<number | null>(null);
   const [canJoinCurrentGame, setCanJoinCurrentGame] = useState<boolean | null>(
@@ -78,6 +87,33 @@ export default function MobilePage() {
       return next;
     });
   }, []);
+  const handleRoomFull = useCallback(
+    (data: { room?: string; maxPlayers?: number }) => {
+      setStartError(
+        data.maxPlayers
+          ? `방 정원이 가득 찼습니다. 최대 ${data.maxPlayers}명까지 참여할 수 있습니다.`
+          : "방 정원이 가득 찼습니다.",
+      );
+      setIsInGame(false);
+      setHasJoined(false);
+      setAssignedSlot(null);
+      setGamePlayers([]);
+      setFinishedPlayers(new Set());
+      setPlayerScores(new Map());
+      setGameResult(null);
+      finishGameEmittedRef.current = false;
+    },
+    [],
+  );
+  const handleRoomPlayersUpdated = useCallback(
+    (data: {
+      playerCount: number;
+      players?: Array<{ socketId: string; name: string }>;
+    }) => {
+      setCanJoinCurrentGame(data.playerCount < MAX_PLAYERS);
+    },
+    [],
+  );
 
   const { emitAimUpdate, emitAimOff, emitThrowDart, leaveGame, socketId } =
     useMobileSocket({
@@ -87,6 +123,9 @@ export default function MobilePage() {
       slot: assignedSlot,
       onPlayerFinished: handlePlayerFinished,
       onPlayerScored: handlePlayerScored,
+      onGameResult: setGameResult,
+      onRoomFull: handleRoomFull,
+      onRoomPlayersUpdated: handleRoomPlayersUpdated,
     });
 
   const {
@@ -143,6 +182,7 @@ export default function MobilePage() {
 
     const handleGameStarted = () => {
       setCanJoinCurrentGame(false);
+      setGameResult(null);
     };
 
     const handleGameEnded = () => {
@@ -269,6 +309,7 @@ export default function MobilePage() {
         setGamePlayers([]);
         setFinishedPlayers(new Set());
         setPlayerScores(new Map());
+        setGameResult(null);
         finishGameEmittedRef.current = false;
         setEndCountdown(null);
       }, 0);
@@ -353,9 +394,10 @@ export default function MobilePage() {
       {sessionValid === true && gameFinished && (
         <ResultScreen
           name={customName}
-          score={totalScore}
+          score={gameResult?.score ?? totalScore}
           onExit={handleExit}
           countdown={endCountdown}
+          serverResult={gameResult}
         />
       )}
 

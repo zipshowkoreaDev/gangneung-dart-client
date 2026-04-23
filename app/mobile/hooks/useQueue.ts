@@ -260,10 +260,19 @@ export function useQueue({
     const onError = (err: unknown) => {
       debugLog(`[Socket] error: ${String(err)}`);
     };
+    const onRoomFull = (data: { room?: string; maxPlayers?: number }) => {
+      debugLog(
+        `[Queue] roomFull: ${data.room ?? room}, maxPlayers: ${
+          data.maxPlayers ?? MAX_PLAYERS
+        }`
+      );
+      leaveQueue();
+    };
 
     socket.on("connect", onConnect);
     socket.on("connect_error", onConnectError);
     socket.on("error", onError);
+    socket.on("roomFull", onRoomFull);
     socket.on("status-queue", onStatusQueue);
     socket.on(GAME_STARTED_EVENT, onGameStarted);
     socket.on("aim-update", onAimUpdate);
@@ -310,6 +319,7 @@ export function useQueue({
       socket.off("connect", onConnect);
       socket.off("connect_error", onConnectError);
       socket.off("error", onError);
+      socket.off("roomFull", onRoomFull);
       socket.off("status-queue", onStatusQueue);
       socket.off(GAME_STARTED_EVENT, onGameStarted);
       socket.off("aim-update", onAimUpdate);

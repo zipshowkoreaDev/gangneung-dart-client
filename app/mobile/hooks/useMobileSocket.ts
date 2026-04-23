@@ -14,6 +14,18 @@ interface UseMobileSocketProps {
     name: string;
     score: number;
   }) => void;
+  onGameResult?: (result: {
+    result: "win" | "lose" | "tie";
+    score: number;
+    rank: number;
+    totalPlayers: number;
+  }) => void;
+  onRoomFull?: (data: { room?: string; maxPlayers?: number }) => void;
+  onRoomPlayersUpdated?: (data: {
+    room?: string;
+    playerCount: number;
+    players?: Array<{ socketId: string; name: string }>;
+  }) => void;
 }
 
 export function useMobileSocket({
@@ -23,6 +35,9 @@ export function useMobileSocket({
   slot,
   onPlayerFinished,
   onPlayerScored,
+  onGameResult,
+  onRoomFull,
+  onRoomPlayersUpdated,
 }: UseMobileSocketProps) {
   const throwCountRef = useRef(0);
   const hasJoinedRef = useRef(false);
@@ -37,6 +52,18 @@ export function useMobileSocket({
   useEffect(() => {
     onPlayerScoredRef.current = onPlayerScored;
   }, [onPlayerScored]);
+  const onGameResultRef = useRef(onGameResult);
+  useEffect(() => {
+    onGameResultRef.current = onGameResult;
+  }, [onGameResult]);
+  const onRoomFullRef = useRef(onRoomFull);
+  useEffect(() => {
+    onRoomFullRef.current = onRoomFull;
+  }, [onRoomFull]);
+  const onRoomPlayersUpdatedRef = useRef(onRoomPlayersUpdated);
+  useEffect(() => {
+    onRoomPlayersUpdatedRef.current = onRoomPlayersUpdated;
+  }, [onRoomPlayersUpdated]);
 
   // enabled가 true로 바뀔 때(재입장 포함)에도 slotRef를 동기화
   useEffect(() => {
@@ -109,6 +136,48 @@ export function useMobileSocket({
         score: data.score,
       });
     };
+    const handleGameResult = (data: {
+      results?: Record<
+        string,
+        {
+          result: "win" | "lose" | "tie";
+          score: number;
+          rank: number;
+          totalPlayers: number;
+        }
+      >;
+    }) => {
+      const mySocketId = socket.id;
+      const myResult = mySocketId ? data.results?.[mySocketId] : undefined;
+      if (!myResult) return;
+      onGameResultRef.current?.(myResult);
+    };
+    const handleRoomFull = (data: { room?: string; maxPlayers?: number }) => {
+      debugLog(`[Socket] roomFull: ${data.room ?? room}`);
+      hasJoinedRef.current = false;
+      currentRoomRef.current = "";
+      throwCountRef.current = 0;
+      onRoomFullRef.current?.(data);
+    };
+    const handleJoinedRoom = (data: {
+      room?: string;
+      playerCount: number;
+      players?: Array<{ socketId: string; name: string }>;
+    }) => {
+      debugLog(
+        `[Socket] joinedRoom: ${data.room ?? room}, Players: ${data.playerCount}`
+      );
+      onRoomPlayersUpdatedRef.current?.(data);
+    };
+    const handleRoomPlayerCount = (data: {
+      room?: string;
+      playerCount: number;
+    }) => {
+      debugLog(
+        `[Socket] roomPlayerCount: ${data.room ?? room}, Players: ${data.playerCount}`
+      );
+      onRoomPlayersUpdatedRef.current?.(data);
+    };
 
     const handleDisconnect = () => {
       debugLog("[Socket] disconnected");
@@ -121,6 +190,10 @@ export function useMobileSocket({
     socket.on("disconnect", handleDisconnect);
     socket.on("aim-off", handleAimOff);
     socket.on("dart-thrown", handleDartThrown);
+    socket.on("game-result", handleGameResult);
+    socket.on("roomFull", handleRoomFull);
+    socket.on("joinedRoom", handleJoinedRoom);
+    socket.on("roomPlayerCount", handleRoomPlayerCount);
 
     if (socket.connected && !hasJoinedRef.current) {
       handleConnect();
@@ -131,6 +204,10 @@ export function useMobileSocket({
       socket.off("disconnect", handleDisconnect);
       socket.off("aim-off", handleAimOff);
       socket.off("dart-thrown", handleDartThrown);
+      socket.off("game-result", handleGameResult);
+      socket.off("roomFull", handleRoomFull);
+      socket.off("joinedRoom", handleJoinedRoom);
+      socket.off("roomPlayerCount", handleRoomPlayerCount);
     };
   }, [room, name, enabled, slot]);
 
