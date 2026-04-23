@@ -107,7 +107,7 @@ export default function DisplayPage() {
 
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-black overflow-hidden">
-      <div className="relative w-full h-full aspect-9/16 max-w-[56.25vh] overflow-hidden bg-[url(/04_roulette_BG.webp)] bg-cover bg-center bg-no-repeat [container-type:inline-size]">
+      <div className="relative w-full h-full aspect-9/16 max-w-[56.25vh] overflow-hidden bg-black [container-type:inline-size]">
         <Scoreboard players={players} />
         {!isGameActive && <DisplayQRCode url={mobileUrl} />}
         <AimOverlay

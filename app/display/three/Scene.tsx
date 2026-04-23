@@ -8,7 +8,9 @@ import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
 const DART_MODEL_SCALE = 24;
 const ROULETTE_MODEL_SCALE = 12;
-const ROULETTE_MODEL_POSITION: [number, number, number] = [0, -2, 0];
+const ROULETTE_MODEL_POSITION: [number, number, number] = [0, 2, 0];
+const BACKDROP_PLANE_Z = -14;
+const BACKDROP_PLANE_SCALE = 1.08;
 const DART_MODEL_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
 const DART_MODEL_PATHS = [
   "/models/dart_blue.glb",
@@ -16,6 +18,48 @@ const DART_MODEL_PATHS = [
   "/models/dart_green.glb",
   "/models/dart_yellow.glb",
 ] as const;
+const BACKDROP_VERTEX_SHADER = `
+  varying vec2 vUv;
+
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const BACKDROP_FRAGMENT_SHADER = `
+  varying vec2 vUv;
+
+  void main() {
+    vec2 center = vUv - vec2(0.5, 0.5);
+    float radial = length(center);
+    float vignette = smoothstep(0.18, 0.78, radial);
+    float horizon = smoothstep(0.018, 0.0, abs(vUv.y - 0.56));
+    float verticalCore = smoothstep(0.22, 0.0, abs(center.x));
+    float portal = smoothstep(0.42, 0.18, abs(radial - 0.24));
+
+    float scan = smoothstep(0.012, 0.0, abs(fract(vUv.y * 58.0) - 0.5));
+    float sideBeamA = smoothstep(0.018, 0.0, abs(center.y + center.x * 0.62 + 0.2));
+    float sideBeamB = smoothstep(0.018, 0.0, abs(center.y - center.x * 0.62 + 0.2));
+    float sidePanels = smoothstep(0.012, 0.0, abs(abs(center.x) - 0.32));
+
+    vec3 deep = vec3(0.006, 0.018, 0.075);
+    vec3 navy = vec3(0.015, 0.055, 0.18);
+    vec3 blue = vec3(0.055, 0.22, 0.72);
+    vec3 cyan = vec3(0.2, 0.84, 1.0);
+
+    vec3 color = deep;
+    color = mix(color, navy, (1.0 - vUv.y) * 0.44);
+    color += blue * verticalCore * 0.22;
+    color += blue * portal * 0.24;
+    color += cyan * horizon * 0.22;
+    color += blue * (sideBeamA + sideBeamB) * 0.11;
+    color += cyan * sidePanels * 0.08;
+    color += cyan * scan * 0.012;
+    color = mix(color, deep * 0.72, vignette * 0.52);
+
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
 
 interface StuckDartProps {
   position: [number, number, number];
@@ -112,6 +156,34 @@ interface FlyingDartData {
 }
 
 let cachedRouletteRadius = 20;
+
+function DepthBackdrop() {
+  const { camera, size } = useThree();
+  const { width, height } = useMemo(() => {
+    const perspectiveCamera = camera as THREE.PerspectiveCamera;
+    const distance = perspectiveCamera.position.z - BACKDROP_PLANE_Z;
+    const fov = THREE.MathUtils.degToRad(perspectiveCamera.fov);
+    const planeHeight = 2 * Math.tan(fov / 2) * distance;
+    const planeWidth = planeHeight * (size.width / size.height);
+
+    return {
+      width: planeWidth * BACKDROP_PLANE_SCALE,
+      height: planeHeight * BACKDROP_PLANE_SCALE,
+    };
+  }, [camera, size.height, size.width]);
+
+  return (
+    <mesh position={[0, 0, BACKDROP_PLANE_Z]} renderOrder={-10}>
+      <planeGeometry args={[width, height]} />
+      <shaderMaterial
+        vertexShader={BACKDROP_VERTEX_SHADER}
+        fragmentShader={BACKDROP_FRAGMENT_SHADER}
+        depthWrite={false}
+        depthTest={false}
+      />
+    </mesh>
+  );
+}
 
 function getDartModelPath(ownerKey: string) {
   const slotMatch = ownerKey.match(/^slot-([1-4])$/);
@@ -266,6 +338,7 @@ export default function Scene() {
 
   return (
     <>
+      <DepthBackdrop />
       <DartEventHandler onDartThrow={handleDartThrow} />
 
       <ambientLight intensity={1.5} color={"white"} />

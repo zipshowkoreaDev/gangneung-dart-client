@@ -17,6 +17,6 @@ export function aimToCanvasNdc(aim: Aim) {
   const { x01, y01 } = aimToDisplayPosition(aim);
   return {
     x: x01 * 2 - 1,
-    y: 1 - 2 * (y01 - DISPLAY_CANVAS_Y_OFFSET),
+    y: 1 - 2 * y01,
   };
 }
