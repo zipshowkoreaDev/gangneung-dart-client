@@ -11,6 +11,7 @@ import {
   AIM_INTERVAL_MS,
   GYROSCOPE_CONFIG,
 } from "@/app/mobile/lib/gyroscopeConfig";
+import type { AimPoint, TurnSyncState } from "@/app/shared/types/turnSync";
 
 export type HitZone =
   | "inner_bull"
@@ -26,7 +27,11 @@ interface HitResult {
 }
 
 interface UseGyroscopeProps {
-  emitAimUpdate: (aim: { x: number; y: number }, skin?: string) => void;
+  emitAimUpdate: (
+    aim: AimPoint,
+    skin?: string,
+    turnSyncState?: TurnSyncState,
+  ) => void;
   emitAimOff: () => void;
   emitThrowDart: (payload: {
     aim: { x: number; y: number };
@@ -87,6 +92,9 @@ export function useGyroscope({
   const lastAimRef = useRef({ x: 0, y: 0 });
   const aimRef = useRef({ x: 0, y: 0 });
   const throwCountRef = useRef(0);
+  const throwScoresRef = useRef<number[]>([]);
+  const thrownAimsRef = useRef<Array<{ x: number; y: number }>>([]);
+  const totalScoreRef = useRef(0);
   const throwBlockedUntilRef = useRef(0);
   const dartTimerIdRef = useRef<number | null>(null);
   const turnFinishTimerIdRef = useRef<number | null>(null);
@@ -126,6 +134,9 @@ export function useGyroscope({
     clearDartTimer();
     clearTurnFinishTimer();
     throwCountRef.current = 0;
+    throwScoresRef.current = [];
+    thrownAimsRef.current = [];
+    totalScoreRef.current = 0;
     isTrackingRef.current = false;
     peakMagRef.current = 0;
 
@@ -161,26 +172,42 @@ export function useGyroscope({
     (hitResult: HitResult, aim: { x: number; y: number }) => {
       if (!sensorsActiveRef.current || throwCountRef.current >= 3) return;
 
-      setTotalScore((prev) => prev + hitResult.score);
+      const nextThrowCount = throwCountRef.current + 1;
+      const nextThrowScores = [...throwScoresRef.current, hitResult.score].slice(0, 3);
+      const nextThrownAims = [...thrownAimsRef.current, aim].slice(0, 3);
+      const nextTotalScore = totalScoreRef.current + hitResult.score;
+      const turnSyncState: TurnSyncState = {
+        currentThrows: nextThrowCount,
+        totalThrows: nextThrowCount,
+        score: nextTotalScore,
+        throwScores: nextThrowScores,
+        thrownAims: nextThrownAims,
+      };
+
+      throwScoresRef.current = nextThrowScores;
+      thrownAimsRef.current = nextThrownAims;
+      totalScoreRef.current = nextTotalScore;
+      setTotalScore(nextTotalScore);
       emitThrowDart({
         aim,
         zone: hitResult.zone,
         score: hitResult.score,
       });
+      emitAimUpdate(aim, undefined, turnSyncState);
 
-      throwCountRef.current += 1;
+      throwCountRef.current = nextThrowCount;
       setThrowsLeft((prev) => Math.max(0, prev - 1));
       setDartTimeLeft(DART_TIME_LIMIT_MS / 1000);
       peakMagRef.current = 0;
 
-      if (throwCountRef.current >= 3) {
+      if (nextThrowCount >= 3) {
         finishTurn();
         return;
       }
 
       startDartTimerRef.current();
     },
-    [emitThrowDart, finishTurn]
+    [emitAimUpdate, emitThrowDart, finishTurn]
   );
 
   const startDartTimer = useCallback(() => {
@@ -257,6 +284,9 @@ export function useGyroscope({
     setTotalScore(0);
     setDartTimeLeft(DART_TIME_LIMIT_MS / 1000);
     throwCountRef.current = 0;
+    throwScoresRef.current = [];
+    thrownAimsRef.current = [];
+    totalScoreRef.current = 0;
     throwBlockedUntilRef.current = 0;
     isTrackingRef.current = false;
     peakMagRef.current = 0;
@@ -327,7 +357,13 @@ export function useGyroscope({
     };
 
     startDartTimer();
-    emitAimUpdate(aimRef.current);
+    emitAimUpdate(aimRef.current, undefined, {
+      currentThrows: 0,
+      totalThrows: 0,
+      score: 0,
+      throwScores: [],
+      thrownAims: [],
+    });
 
     window.addEventListener("deviceorientation", handleOrientationRef.current);
     window.addEventListener("devicemotion", handleMotionRef.current);

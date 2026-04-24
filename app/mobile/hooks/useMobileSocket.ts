@@ -1,5 +1,9 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { socket } from "@/shared/socket";
+import {
+  INITIAL_TURN_SYNC_STATE,
+  type TurnSyncState,
+} from "@/app/shared/types/turnSync";
 import type { PlayerSlot } from "@/lib/room";
 import { debugLog } from "@/app/mobile/lib/debugLog";
 
@@ -48,6 +52,8 @@ export function useMobileSocket({
   const currentRoomRef = useRef<string>("");
   const slotRef = useRef<PlayerSlot | null>(null);
   const gameEndedRef = useRef(false);
+  const lastAimRef = useRef({ x: 0, y: 0 });
+  const turnSyncStateRef = useRef<TurnSyncState>(INITIAL_TURN_SYNC_STATE);
   const [currentSocketId, setCurrentSocketId] = useState<string | undefined>(
     () => socket.id,
   );
@@ -85,6 +91,7 @@ export function useMobileSocket({
     slotRef.current = slot;
     if (enabled && slot) {
       throwCountRef.current = 0;
+      turnSyncStateRef.current = INITIAL_TURN_SYNC_STATE;
     }
   }, [slot, enabled]);
 
@@ -111,8 +118,9 @@ export function useMobileSocket({
         socketId: socket.id,
         name,
         slot,
-        aim: { x: 0, y: 0 },
+        aim: lastAimRef.current,
         registration: true,
+        turnSyncState: turnSyncStateRef.current,
       });
     };
     const joinPlayerRoom = () => {
@@ -291,13 +299,42 @@ export function useMobileSocket({
       socket.emit("leave-queue");
       hasJoinedRef.current = false;
       currentRoomRef.current = "";
+      turnSyncStateRef.current = INITIAL_TURN_SYNC_STATE;
     };
   }, [leaveJoinedRooms]);
 
-  const emitAimUpdate = useCallback(
-    (aim: { x: number; y: number }, skin?: string) => {
+  useEffect(() => {
+    if (!room || !enabled || !slot) return;
+
+    const intervalId = window.setInterval(() => {
       if (gameEndedRef.current) return;
       if (!socket.connected || !slotRef.current) return;
+
+      socket.emit("aim-update", {
+        room,
+        socketId: socket.id,
+        name,
+        slot: slotRef.current,
+        aim: lastAimRef.current,
+        turnSyncState: turnSyncStateRef.current,
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [enabled, name, room, slot]);
+
+  const emitAimUpdate = useCallback(
+    (
+      aim: { x: number; y: number },
+      skin?: string,
+      turnSyncState?: TurnSyncState,
+    ) => {
+      if (gameEndedRef.current) return;
+      if (!socket.connected || !slotRef.current) return;
+      lastAimRef.current = aim;
+      if (turnSyncState) {
+        turnSyncStateRef.current = turnSyncState;
+      }
       socket.emit("aim-update", {
         room,
         socketId: socket.id,
@@ -305,6 +342,7 @@ export function useMobileSocket({
         slot: slotRef.current,
         skin,
         aim,
+        turnSyncState: turnSyncStateRef.current,
       });
     },
     [room, name]
@@ -368,6 +406,7 @@ export function useMobileSocket({
     currentRoomRef.current = "";
     slotRef.current = null;
     gameEndedRef.current = true;
+    turnSyncStateRef.current = INITIAL_TURN_SYNC_STATE;
   }, [leaveJoinedRooms, name]);
 
   return {

@@ -105,6 +105,23 @@ function createDartId() {
   return `${Date.now()}-${Math.random()}`;
 }
 
+function aimToBoardPosition(
+  aim: { x: number; y: number },
+  camera: THREE.Camera,
+): [number, number, number] | null {
+  const { x, y } = aimToCanvasNdc(aim);
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2(x, y);
+  raycaster.setFromCamera(mouse, camera);
+
+  const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -1);
+  const intersectPoint = new THREE.Vector3();
+  const hasIntersection = raycaster.ray.intersectPlane(plane, intersectPoint);
+  if (!hasIntersection) return null;
+
+  return [intersectPoint.x, intersectPoint.y, intersectPoint.z];
+}
+
 // Static dart mesh already stuck on the board
 function StuckDart({ position, modelPath }: StuckDartProps) {
   const { scene } = useGLTF(modelPath);
@@ -233,33 +250,55 @@ function DartEventHandler({
       const data = customEvent.detail;
 
       if (!data.aim) return;
-
-      const { x, y } = aimToCanvasNdc(data.aim);
-
-      const raycaster = new THREE.Raycaster();
-      const mouse = new THREE.Vector2(x, y);
-      raycaster.setFromCamera(mouse, camera);
-
-      const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -1);
-      const intersectPoint = new THREE.Vector3();
-      const hasIntersection = raycaster.ray.intersectPlane(
-        plane,
-        intersectPoint,
-      );
-      if (!hasIntersection) return;
+      const boardPosition = aimToBoardPosition(data.aim, camera);
+      if (!boardPosition) return;
 
       const ownerKey = data.playerId || data.name || data.socketId || "player";
-      const targetPosition: [number, number, number] = [
-        intersectPoint.x,
-        intersectPoint.y,
-        intersectPoint.z,
-      ];
-      onDartThrow(targetPosition, ownerKey);
+      onDartThrow(boardPosition, ownerKey);
     };
 
     window.addEventListener(DISPLAY_EVENTS.dartThrow, handleThrow);
     return () => window.removeEventListener(DISPLAY_EVENTS.dartThrow, handleThrow);
   }, [camera, onDartThrow]);
+
+  return null;
+}
+
+function SyncPlayerDartsHandler({
+  onSyncPlayerDarts,
+}: {
+  onSyncPlayerDarts: (
+    ownerKey: string,
+    positions: [number, number, number][],
+  ) => void;
+}) {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    const handleSyncPlayerDarts = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const key = customEvent.detail?.key as string | undefined;
+      const aims = customEvent.detail?.aims as
+        | Array<{ x: number; y: number }>
+        | undefined;
+      if (!key || !Array.isArray(aims)) return;
+
+      const positions = aims
+        .map((aim) => aimToBoardPosition(aim, camera))
+        .filter(
+          (position): position is [number, number, number] => position !== null,
+        );
+
+      onSyncPlayerDarts(key, positions);
+    };
+
+    window.addEventListener(DISPLAY_EVENTS.syncPlayerDarts, handleSyncPlayerDarts);
+    return () =>
+      window.removeEventListener(
+        DISPLAY_EVENTS.syncPlayerDarts,
+        handleSyncPlayerDarts,
+      );
+  }, [camera, onSyncPlayerDarts]);
 
   return null;
 }
@@ -314,10 +353,29 @@ export default function Scene() {
     }, DART_FLIGHT_DURATION_MS);
   };
 
+  const handleSyncPlayerDarts = (
+    ownerKey: string,
+    positions: [number, number, number][],
+  ) => {
+    const modelPath = getDartModelPath(ownerKey);
+
+    setFlyingDarts((prev) => prev.filter((dart) => dart.ownerKey !== ownerKey));
+    setStuckDarts((prev) => [
+      ...prev.filter((dart) => dart.ownerKey !== ownerKey),
+      ...positions.map((position, index) => ({
+        id: `sync-${ownerKey}-${index}`,
+        position,
+        ownerKey,
+        modelPath,
+      })),
+    ]);
+  };
+
   return (
     <>
       <DepthBackdrop />
       <DartEventHandler onDartThrow={handleDartThrow} />
+      <SyncPlayerDartsHandler onSyncPlayerDarts={handleSyncPlayerDarts} />
 
       <ambientLight intensity={1.5} color={"white"} />
       <directionalLight

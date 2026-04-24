@@ -26,12 +26,13 @@ export default function DisplayPage() {
     setPlayers,
   } = useDisplayState();
   const { rankings, handlePlayersFinish } = useRankings();
-  const { isGameActive, winners } = useDisplayGameSession({
+  const { hasMatchStarted, winners } = useDisplayGameSession({
     setAimPositions,
     setPlayers,
   });
 
   const mobileUrl = useDisplayQrUrl();
+  const shouldShowQr = !hasMatchStarted;
 
   // mobileUrl handled by useDisplayQrUrl
 
@@ -47,7 +48,7 @@ export default function DisplayPage() {
     <div className="w-screen h-screen flex items-center justify-center bg-black overflow-hidden">
       <div className="relative w-full h-full aspect-9/16 max-w-[56.25vh] overflow-hidden bg-black [container-type:inline-size]">
         <Scoreboard players={players} />
-        {!isGameActive && <DisplayQRCode url={mobileUrl} />}
+        {shouldShowQr && <DisplayQRCode url={mobileUrl} />}
         <DartCanvas />
         <AimOverlay
           aimPositions={aimPositions}

@@ -29,6 +29,7 @@ import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import type { PlayerScore } from "@/app/display/types/player";
 import { stripDisplayName } from "@/lib/displayName";
 import { DISPLAY_EVENTS } from "@/lib/displayEvents";
+import type { TurnSyncState } from "@/app/shared/types/turnSync";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
 const QUEUE_STATUS_INTERVAL_MS = 5000;
@@ -164,6 +165,7 @@ export function useDisplaySocket({
       logPlayerCount("Room joined", data);
 
       const joinedSocketIds = getPlayerSocketIds(data.players);
+      const removedPlayerKeys: string[] = [];
       if (joinedSocketIds.length > 0) {
         queuedPlayerIdsRef.current = Array.from(
           new Set([...queuedPlayerIdsRef.current, ...joinedSocketIds])
@@ -174,14 +176,15 @@ export function useDisplaySocket({
         const next = new Map(prev);
         const joinedSocketIdSet = new Set(joinedSocketIds);
 
-        if (joinedSocketIdSet.size > 0) {
+        if (Array.isArray(data.players)) {
           Array.from(next.entries()).forEach(([key, player]) => {
-            if (
-              player.isWaiting &&
-              player.socketId &&
-              !joinedSocketIdSet.has(player.socketId)
-            ) {
+            if (!player.socketId || joinedSocketIdSet.has(player.socketId)) {
+              return;
+            }
+
+            if (player.isWaiting || player.isConnected) {
               next.delete(key);
+              removedPlayerKeys.push(key);
             }
           });
         }
@@ -231,6 +234,29 @@ export function useDisplaySocket({
         playersRef.current = next;
         return next;
       });
+
+      if (removedPlayerKeys.length > 0) {
+        const removedKeySet = new Set(removedPlayerKeys);
+
+        setAimPositions((prev) => {
+          const next = new Map(prev);
+          removedPlayerKeys.forEach((key) => next.delete(key));
+          return next;
+        });
+
+        removedPlayerKeys.forEach((key) => {
+          playerLastScoresRef.current.delete(key);
+          finishedPlayerKeysRef.current.delete(key);
+          playerAliasKeyRef.current.delete(key);
+          window.dispatchEvent(
+            new CustomEvent(DISPLAY_EVENTS.clearPlayerDarts, { detail: { key } })
+          );
+        });
+
+        onLog?.(
+          `Removed disconnected players: ${Array.from(removedKeySet).join(", ")}`
+        );
+      }
     };
 
     const onRoomPlayerCount = (data: { room: string; playerCount: number }) => {
@@ -405,6 +431,7 @@ export function useDisplaySocket({
       registration?: boolean;
       queueRegistration?: boolean;
       aim: { x: number; y: number };
+      turnSyncState?: TurnSyncState;
     }) => {
       if (!isRoomEvent(data.room)) return;
 
@@ -508,18 +535,25 @@ export function useDisplaySocket({
               return prev;
             }
             const isBecomingReady = !existing.isReady && existing.totalThrows < 3;
-            next.set(key, {
-              ...existing,
-              slot: slot ?? existing.slot,
-              isConnected: true,
-              isReady: isRegistration ? existing.isReady : true,
+              next.set(key, {
+                ...existing,
+                slot: slot ?? existing.slot,
+                isConnected: true,
+                isReady: isRegistration ? existing.isReady : true,
               socketId: data.socketId ?? existing.socketId,
               serverName: data.name ?? existing.serverName,
-              name: displayName ?? existing.name,
-              isWaiting: false,
-              dartDeadlineEndsAt: isBecomingReady
-                ? Date.now() + DART_TIME_LIMIT_MS
-                : existing.dartDeadlineEndsAt,
+                name: displayName ?? existing.name,
+                isWaiting: false,
+                score: data.turnSyncState?.score ?? existing.score,
+                totalThrows:
+                  data.turnSyncState?.totalThrows ?? existing.totalThrows,
+                currentThrows:
+                  data.turnSyncState?.currentThrows ?? existing.currentThrows,
+                throwScores:
+                  data.turnSyncState?.throwScores ?? existing.throwScores,
+                dartDeadlineEndsAt: isBecomingReady
+                  ? Date.now() + DART_TIME_LIMIT_MS
+                  : existing.dartDeadlineEndsAt,
             });
             playersRef.current = next;
             return next;
@@ -531,13 +565,13 @@ export function useDisplaySocket({
               serverName: data.name,
               slot,
               name: displayName,
-              score: 0,
+              score: data.turnSyncState?.score ?? 0,
               isConnected: true,
               isReady: !isRegistration,
               isWaiting: false,
-              totalThrows: 0,
-              currentThrows: 0,
-              throwScores: [],
+              totalThrows: data.turnSyncState?.totalThrows ?? 0,
+              currentThrows: data.turnSyncState?.currentThrows ?? 0,
+              throwScores: data.turnSyncState?.throwScores ?? [],
               dartDeadlineEndsAt: isRegistration
                 ? undefined
                 : Date.now() + DART_TIME_LIMIT_MS,
@@ -556,6 +590,14 @@ export function useDisplaySocket({
             next.set(key, { x, y, skin: data.skin });
             return next;
           });
+        }
+
+        if (Array.isArray(data.turnSyncState?.thrownAims)) {
+          window.dispatchEvent(
+            new CustomEvent(DISPLAY_EVENTS.syncPlayerDarts, {
+              detail: { key, aims: data.turnSyncState.thrownAims },
+            })
+          );
         }
       }
     };

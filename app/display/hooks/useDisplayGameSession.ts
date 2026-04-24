@@ -17,7 +17,7 @@ export default function useDisplayGameSession({
   setAimPositions,
   setPlayers,
 }: UseDisplayGameSessionProps) {
-  const [isGameActive, setIsGameActive] = useState(false);
+  const [hasMatchStarted, setHasMatchStarted] = useState(false);
   const [winners, setWinners] = useState<FinishedPlayer[]>([]);
   const [endCountdown, setEndCountdown] = useState<number | null>(null);
   const isShowingGameFinishedRef = useRef(false);
@@ -29,7 +29,7 @@ export default function useDisplayGameSession({
       isShowingGameFinishedRef.current = false;
       setWinners([]);
       setEndCountdown(null);
-      setIsGameActive(true);
+      setHasMatchStarted(true);
     };
 
     const handleDartThrow = () => {
@@ -38,7 +38,7 @@ export default function useDisplayGameSession({
         return;
       }
 
-      setIsGameActive(true);
+      setHasMatchStarted(true);
     };
 
     const handleGameStarted = clearFinishedOverlayForNewGame;
@@ -58,7 +58,6 @@ export default function useDisplayGameSession({
       } else {
         setWinners([]);
       }
-      setIsGameActive(true);
       setEndCountdown(GAME_END_COUNTDOWN_SECONDS);
     };
 
@@ -80,7 +79,7 @@ export default function useDisplayGameSession({
       const cleanupSession = gameSessionRef.current;
       const timer = window.setTimeout(() => {
         if (gameSessionRef.current !== cleanupSession) return;
-        setIsGameActive(false);
+        setHasMatchStarted(false);
         setWinners([]);
         setEndCountdown(null);
         isShowingGameFinishedRef.current = false;
@@ -100,7 +99,7 @@ export default function useDisplayGameSession({
   }, [endCountdown, setAimPositions, setPlayers]);
 
   return {
-    isGameActive,
+    hasMatchStarted,
     winners,
   };
 }

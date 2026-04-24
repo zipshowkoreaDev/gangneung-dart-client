@@ -4,4 +4,5 @@ export const DISPLAY_EVENTS = {
   gameFinished: "GAME_FINISHED",
   gameStarted: "GAME_STARTED",
   resetScene: "RESET_SCENE",
+  syncPlayerDarts: "SYNC_PLAYER_DARTS",
 } as const;
