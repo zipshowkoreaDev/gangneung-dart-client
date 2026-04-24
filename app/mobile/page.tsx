@@ -182,22 +182,14 @@ export default function MobilePage() {
     if (!socketId || !hasFinishedTurn) return;
 
     const timerId = window.setTimeout(() => {
-      handlePlayerScored({
-        socketId,
-        name: socketName,
-        score: totalScore,
-      });
       handlePlayerFinished(socketId);
     }, TURN_RESULT_DELAY_MS);
 
     return () => window.clearTimeout(timerId);
   }, [
     handlePlayerFinished,
-    handlePlayerScored,
     hasFinishedTurn,
     socketId,
-    socketName,
-    totalScore,
   ]);
 
   useEffect(() => {

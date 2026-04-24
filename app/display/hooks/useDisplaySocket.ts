@@ -31,6 +31,7 @@ import { stripDisplayName } from "@/lib/displayName";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
 const QUEUE_STATUS_INTERVAL_MS = 5000;
+const THROW_DUPLICATE_WINDOW_MS = 1000;
 
 interface UseDisplaySocketProps {
   room: string;
@@ -75,6 +76,7 @@ export function useDisplaySocket({
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
   const playerAliasKeyRef = useRef<Map<string, string>>(new Map());
   const queuedPlayerIdsRef = useRef<string[]>([]);
+  const recentThrowFingerprintsRef = useRef<Map<string, number>>(new Map());
   // React state 비동기 반영 경쟁 조건 방지: 마지막 점수를 ref로 동기 추적
   const playerLastScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
 
@@ -106,6 +108,7 @@ export function useDisplaySocket({
       playerLastScoresRef.current.clear();
       playerAliasKeyRef.current.clear();
       finishedPlayerKeysRef.current.clear();
+      recentThrowFingerprintsRef.current.clear();
       gameFinishedHandledRef.current = false;
     };
     const clearDisplayState = () => {
@@ -288,6 +291,32 @@ export function useDisplaySocket({
         onLog?.(`Ignored dart from finished player ${key}`);
         return;
       }
+
+      const fingerprint = JSON.stringify({
+        key,
+        socketId: data.socketId,
+        score: data.score,
+        aimX: Number((data.aim?.x ?? 0).toFixed(4)),
+        aimY: Number((data.aim?.y ?? 0).toFixed(4)),
+      });
+      const now = Date.now();
+      const lastSeenAt = recentThrowFingerprintsRef.current.get(fingerprint);
+      if (
+        typeof lastSeenAt === "number" &&
+        now - lastSeenAt < THROW_DUPLICATE_WINDOW_MS
+      ) {
+        onLog?.(`Ignored duplicate dart-thrown event: ${key}`);
+        return;
+      }
+      recentThrowFingerprintsRef.current.set(fingerprint, now);
+      Array.from(recentThrowFingerprintsRef.current.entries()).forEach(
+        ([existingFingerprint, seenAt]) => {
+          if (now - seenAt >= THROW_DUPLICATE_WINDOW_MS) {
+            recentThrowFingerprintsRef.current.delete(existingFingerprint);
+          }
+        }
+      );
+
       if (!playersRef.current.has(key)) {
         const displayName = data.name ? stripDisplayName(data.name) : key;
         const nextPlayers = new Map(playersRef.current);

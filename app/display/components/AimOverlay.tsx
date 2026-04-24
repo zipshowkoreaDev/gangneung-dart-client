@@ -12,7 +12,7 @@ type AimPosition = {
 
 type AimOverlayProps = {
   aimPositions: Map<string, AimPosition>;
-  players: Map<string, { isReady: boolean; name?: string; slot?: PlayerSlot }>;
+  players: Map<string, { isReady: boolean; slot?: PlayerSlot }>;
 };
 
 function getSlotFromPlayerKey(playerKey: string) {
@@ -23,7 +23,7 @@ function getSlotFromPlayerKey(playerKey: string) {
 
 function resolveColor(
   playerKey: string,
-  players: Map<string, { isReady: boolean; name?: string; slot?: PlayerSlot }>
+  players: Map<string, { isReady: boolean; slot?: PlayerSlot }>
 ) {
   const slot = players.get(playerKey)?.slot ?? getSlotFromPlayerKey(playerKey);
   if (slot) {
@@ -77,26 +77,6 @@ export default function AimOverlay({
                   pointerEvents: "none",
                 }}
               />
-              {/* 플레이어 이름 */}
-              <div
-                style={{
-                  position: "absolute",
-                  left: `${x01 * 100}%`,
-                  top: `${y01 * 100}%`,
-                  transform: "translate(-50%, calc(-50% - 35px))",
-                  background: "rgba(0, 0, 0, 0.7)",
-                  color: "white",
-                  padding: "4px 8px",
-                  borderRadius: 4,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  zIndex: 7,
-                  pointerEvents: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {players.get(playerKey)?.name ?? playerKey}
-              </div>
             </div>
           );
         })}
