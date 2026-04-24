@@ -8,14 +8,11 @@ export default function useDisplayState() {
   const [players, setPlayers] = useState<Map<string, PlayerScore>>(
     () => new Map()
   );
-  const [playerOrder, setPlayerOrder] = useState<string[]>([]);
 
   return {
     aimPositions,
     setAimPositions,
     players,
     setPlayers,
-    playerOrder,
-    setPlayerOrder,
   };
 }

@@ -14,8 +14,8 @@ export default function Scoreboard({ players }: ScoreboardProps) {
 
   if (playerList.length === 0) return null;
 
-  const renderThrowDots = (player: PlayerScore, playerIndex: number) => {
-    const color = getPlayerColor(playerIndex);
+  const renderThrowDots = (player: PlayerScore) => {
+    const color = player.slot ? getPlayerColor(player.slot - 1) : "#ffffff";
     const remainingThrows = Math.max(0, 3 - player.totalThrows);
 
     return (
@@ -41,7 +41,7 @@ export default function Scoreboard({ players }: ScoreboardProps) {
     );
   };
 
-  const renderPlayerCard = (player: PlayerScore, playerIndex: number) => {
+  const renderPlayerCard = (player: PlayerScore) => {
     const throwScores = player.throwScores ?? [];
 
     return (
@@ -60,7 +60,7 @@ export default function Scoreboard({ players }: ScoreboardProps) {
           <span className="min-w-0 flex-1 truncate text-left text-[clamp(0.95rem,3cqw,1.5rem)] font-bold leading-none">
             {player.name}
           </span>
-          {renderThrowDots(player, playerIndex)}
+          {renderThrowDots(player)}
         </div>
 
         <div className="flex min-h-[clamp(1.45rem,4cqw,2rem)] items-center justify-between gap-[clamp(0.45rem,2cqw,1rem)] text-[clamp(1.05rem,3.6cqw,2rem)] font-bold leading-none text-[#FFD700]">
@@ -82,20 +82,20 @@ export default function Scoreboard({ players }: ScoreboardProps) {
   return (
     <div className="absolute top-0 left-0 z-10 w-full bg-white/20 p-5 shadow-md backdrop-blur-md">
       <div className="mb-3 flex items-center justify-between text-white">
-        <div className="text-[1rem] font-semibold opacity-80">참가자</div>
+        <div />
         <div className="rounded-md bg-black/35 px-3 py-1 text-[0.9rem] font-bold tabular-nums">
           {playerList.length}/{MAX_PLAYERS}
         </div>
       </div>
       <div className="flex gap-5">
-        {playerList.map((player, index) => (
+        {playerList.map((player) => (
           <div
             key={
               player.slot ? `slot-${player.slot}` : player.socketId || player.name
             }
             className="flex-1 bg-white/40 rounded-lg"
           >
-            {renderPlayerCard(player, index)}
+            {renderPlayerCard(player)}
           </div>
         ))}
       </div>

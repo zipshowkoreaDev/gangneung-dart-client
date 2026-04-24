@@ -2,6 +2,7 @@
 
 import { aimToDisplayPosition } from "@/lib/displayAimCoordinates";
 import { getPlayerColor } from "@/app/display/utils/playerColors";
+import type { PlayerSlot } from "@/lib/room";
 
 type AimPosition = {
   x: number;
@@ -11,18 +12,28 @@ type AimPosition = {
 
 type AimOverlayProps = {
   aimPositions: Map<string, AimPosition>;
-  playerOrder: string[];
-  players: Map<string, { isReady: boolean; name?: string }>;
+  players: Map<string, { isReady: boolean; name?: string; slot?: PlayerSlot }>;
 };
 
-function resolveColor(playerKey: string, playerOrder: string[]) {
-  const index = playerOrder.indexOf(playerKey);
-  return getPlayerColor(index);
+function getSlotFromPlayerKey(playerKey: string) {
+  const slotMatch = playerKey.match(/^slot-([1-4])$/);
+  if (!slotMatch) return undefined;
+  return Number(slotMatch[1]) as PlayerSlot;
+}
+
+function resolveColor(
+  playerKey: string,
+  players: Map<string, { isReady: boolean; name?: string; slot?: PlayerSlot }>
+) {
+  const slot = players.get(playerKey)?.slot ?? getSlotFromPlayerKey(playerKey);
+  if (slot) {
+    return getPlayerColor(slot - 1);
+  }
+  return "#ffffff";
 }
 
 export default function AimOverlay({
   aimPositions,
-  playerOrder,
   players,
 }: AimOverlayProps) {
   return (
@@ -30,7 +41,7 @@ export default function AimOverlay({
       {Array.from(aimPositions.entries())
         .map(([playerKey, pos]) => {
           const { x01, y01 } = aimToDisplayPosition(pos);
-          const color = resolveColor(playerKey, playerOrder);
+          const color = resolveColor(playerKey, players);
 
           return (
             <div key={playerKey}>

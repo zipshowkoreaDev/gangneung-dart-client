@@ -27,7 +27,6 @@ interface UseDisplaySocketProps {
   onLog?: (msg: string) => void;
   setAimPositions: Dispatch<SetStateAction<AimState>>;
   setPlayers: Dispatch<SetStateAction<Map<string, PlayerScore>>>;
-  setPlayerOrder: Dispatch<SetStateAction<string[]>>;
   players: Map<string, PlayerScore>;
   onPlayersFinish?: (
     players: Array<{ name: string; score: number }>,
@@ -80,7 +79,6 @@ export function useDisplaySocket({
   onLog,
   setAimPositions,
   setPlayers,
-  setPlayerOrder,
   players,
   onPlayersFinish,
 }: UseDisplaySocketProps) {
@@ -209,7 +207,6 @@ export function useDisplaySocket({
     const clearDisplayState = () => {
       setAimPositions(new Map());
       setPlayers(new Map());
-      setPlayerOrder([]);
       playersRef.current = new Map();
     };
 
@@ -399,7 +396,6 @@ export function useDisplaySocket({
         });
         playersRef.current = nextPlayers;
         setPlayers(nextPlayers);
-        setPlayerOrder((prev) => (prev.includes(key) ? prev : [...prev, key]));
       }
 
       const score =
@@ -513,9 +509,6 @@ export function useDisplaySocket({
           return next;
         });
 
-        setPlayerOrder((prev) =>
-          prev.includes(waitingKey) ? prev : [...prev, waitingKey]
-        );
         return;
       }
 
@@ -527,11 +520,8 @@ export function useDisplaySocket({
       if (key) {
         if (startsNewGame) {
           setAimPositions(new Map());
-          setPlayerOrder([]);
         }
         let shouldUpdateAim = !isRegistration;
-        let addedPlayer = false;
-        let movedPlayerKey = false;
 
         setPlayers((prev) => {
           const next = startsNewGame ? new Map<string, PlayerScore>() : new Map(prev);
@@ -540,7 +530,6 @@ export function useDisplaySocket({
           const existing = existingEntry?.[1];
           if (existingKey && existingKey !== key) {
             next.delete(existingKey);
-            movedPlayerKey = true;
           }
           removeDuplicateWaitingPlayers(next, key, data.socketId);
 
@@ -608,27 +597,12 @@ export function useDisplaySocket({
                 : Date.now() + DART_TIME_LIMIT_MS,
               turnDelayEndsAt: undefined,
             });
-            addedPlayer = true;
             playersRef.current = next;
             return next;
           }
 
           return next;
         });
-
-        if (addedPlayer || movedPlayerKey) {
-          setPlayerOrder((prev) => {
-            if (prev.includes(key)) return prev;
-            const previousKeys = [data.socketId, data.playerId, data.name]
-              .map((alias) => (alias ? playerAliasKeyRef.current.get(alias) : undefined))
-              .filter(Boolean) as string[];
-            const filtered = prev.filter(
-              (playerKey) => playerKey !== getQueuePlayerKey(data.socketId ?? "") &&
-                !previousKeys.includes(playerKey)
-            );
-            return [...filtered, key];
-          });
-        }
 
         if (shouldUpdateAim) {
           setAimPositions((prev) => {
@@ -839,7 +813,6 @@ export function useDisplaySocket({
     onLog,
     setAimPositions,
     setPlayers,
-    setPlayerOrder,
   ]);
 
   return {};

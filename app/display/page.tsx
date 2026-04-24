@@ -34,8 +34,6 @@ export default function DisplayPage() {
     setAimPositions,
     players,
     setPlayers,
-    playerOrder,
-    setPlayerOrder,
   } = useDisplayState();
   const { rankings, handlePlayersFinish } = useRankings();
 
@@ -47,7 +45,6 @@ export default function DisplayPage() {
     room: ROOM,
     setAimPositions,
     setPlayers,
-    setPlayerOrder,
     players,
     onPlayersFinish: handlePlayersFinish,
   });
@@ -110,7 +107,6 @@ export default function DisplayPage() {
         setEndCountdown(null);
         isShowingGameFinishedRef.current = false;
         setPlayers(new Map());
-        setPlayerOrder([]);
         setAimPositions(new Map());
         window.dispatchEvent(new CustomEvent("RESET_SCENE"));
       }, 0);
@@ -122,7 +118,7 @@ export default function DisplayPage() {
       1000,
     );
     return () => window.clearTimeout(timer);
-  }, [endCountdown, setAimPositions, setPlayerOrder, setPlayers]);
+  }, [endCountdown, setAimPositions, setPlayers]);
 
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-black overflow-hidden">
@@ -132,7 +128,6 @@ export default function DisplayPage() {
         <DartCanvas />
         <AimOverlay
           aimPositions={aimPositions}
-          playerOrder={playerOrder}
           players={players}
         />
         <CountdownDisplay players={players} />
