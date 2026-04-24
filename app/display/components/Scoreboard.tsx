@@ -11,6 +11,9 @@ export default function Scoreboard({ players }: ScoreboardProps) {
     (a, b) =>
       (a.slot ?? Number.MAX_SAFE_INTEGER) - (b.slot ?? Number.MAX_SAFE_INTEGER),
   );
+  const hasGameStarted = sortedPlayers.some(
+    (player) => !player.isWaiting && (player.isReady || player.totalThrows > 0),
+  );
   const playersBySlot = new Map(
     sortedPlayers
       .filter((player): player is PlayerScore & { slot: PlayerSlot } => Boolean(player.slot))
@@ -53,7 +56,12 @@ export default function Scoreboard({ players }: ScoreboardProps) {
         style={{ boxShadow: `inset 0 0 0 1px ${color}33` }}
       >
         <div className="flex min-w-0 items-center justify-between gap-4">
-          <span className="min-w-0 flex-1 truncate text-left text-[clamp(0.95rem,3cqw,1.5rem)] font-bold leading-none text-white/35">
+          <span
+            className={[
+              "min-w-0 flex-1 truncate text-left text-[clamp(0.95rem,3cqw,1.5rem)] font-bold leading-none text-white/35 transition-opacity",
+              hasGameStarted ? "opacity-0" : "opacity-100",
+            ].join(" ")}
+          >
             PLAYER {slot}
           </span>
           <div className="flex shrink-0 items-center gap-[0.55rem]" aria-hidden="true">
@@ -68,7 +76,14 @@ export default function Scoreboard({ players }: ScoreboardProps) {
 
         <div className="flex min-h-[clamp(1.45rem,4cqw,2rem)] items-center justify-between gap-[clamp(0.45rem,2cqw,1rem)] text-[clamp(1.05rem,3.6cqw,2rem)] font-bold leading-none text-white/20">
           <div className="flex min-w-0 items-center gap-[clamp(0.35rem,1.5cqw,0.75rem)] text-left" />
-          <div className="shrink-0 text-right">READY</div>
+          <div
+            className={[
+              "shrink-0 text-right text-white/20 transition-opacity",
+              hasGameStarted ? "opacity-0" : "opacity-100",
+            ].join(" ")}
+          >
+            READY
+          </div>
         </div>
       </div>
     );
@@ -96,16 +111,16 @@ export default function Scoreboard({ players }: ScoreboardProps) {
           {renderThrowDots(player)}
         </div>
 
-        <div className="flex min-h-[clamp(1.45rem,4cqw,2rem)] items-center justify-between gap-[clamp(0.45rem,2cqw,1rem)] text-[clamp(1.05rem,3.6cqw,2rem)] font-bold leading-none text-[#FFD700]">
-          <div className="flex min-w-0 items-center gap-[clamp(0.35rem,1.5cqw,0.75rem)] text-left">
+        <div className="flex min-h-[clamp(1.45rem,4cqw,2rem)] items-center justify-between gap-[clamp(0.45rem,2cqw,1rem)] font-bold leading-none text-[#FFD700]">
+          <div className="flex min-w-0 items-center gap-[clamp(0.25rem,1.1cqw,0.55rem)] text-left text-[clamp(0.9rem,2.8cqw,1.45rem)]">
             {throwScores.map((score, index) => (
               <span key={`${index}-${score}`} className="shrink-0">
                 {score}
               </span>
             ))}
           </div>
-          <div className="shrink-0 text-right">
-            {throwScores.length > 0 ? `${player.score}점` : ""}
+          <div className="shrink-0 text-right text-[clamp(1rem,3.1cqw,1.75rem)]">
+            {throwScores.length > 0 ? `${player.score}점` : "READY"}
           </div>
         </div>
       </div>
