@@ -2,8 +2,8 @@
 export default function SessionValidating() {
   return (
     <div className="flex flex-col items-center justify-center">
-      <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-      <div className="mt-6 text-white text-lg">세션 확인 중...</div>
+      <div className="h-16 w-16 animate-spin rounded-full border-4 border-black/10 border-t-neutral-700" />
+      <div className="mt-6 text-lg text-neutral-800">세션 확인 중...</div>
     </div>
   );
 }

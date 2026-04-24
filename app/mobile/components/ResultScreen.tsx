@@ -32,21 +32,21 @@ export default function ResultScreen({
 
   return (
     <div className="flex flex-col items-center gap-8">
-      <div className="text-[28px] font-bold text-white text-center">
+      <div className="text-center text-[28px] font-bold text-neutral-900">
         게임 완료!
       </div>
 
-      <div className="w-full max-w-[320px] bg-white/10 rounded-3xl border border-white/20 p-8 backdrop-blur-sm">
-        <div className="text-center text-white/70 text-lg mb-2">
+      <div className="w-full max-w-[320px] rounded-3xl border border-black/10 bg-white/72 p-8 backdrop-blur-sm">
+        <div className="mb-2 text-center text-lg text-neutral-600">
           {displayName}
         </div>
         <div className="text-center">
           <span className="text-6xl font-bold text-[#FFD700]">{score}점</span>
         </div>
         {serverResult && (
-          <div className="mt-4 flex items-center justify-center gap-3 text-white">
+          <div className="mt-4 flex items-center justify-center gap-3 text-neutral-800">
             {resultLabel && (
-              <span className="rounded-full bg-white/15 px-4 py-2 text-base font-bold">
+              <span className="rounded-full bg-black/6 px-4 py-2 text-base font-bold">
                 {resultLabel}
               </span>
             )}
@@ -55,7 +55,7 @@ export default function ResultScreen({
             </span>
           </div>
         )}
-        <div className="text-center text-white/50 text-sm mt-4">
+        <div className="mt-4 text-center text-sm text-neutral-500">
           수고하셨습니다.
         </div>
       </div>

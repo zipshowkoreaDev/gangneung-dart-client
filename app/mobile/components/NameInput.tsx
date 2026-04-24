@@ -15,7 +15,7 @@ export default function NameInput({
 }: NameInputProps) {
   return (
     <div className="flex flex-col items-center gap-8">
-      <div className="text-[28px] font-bold text-white text-center">
+      <div className="text-center text-[28px] font-bold text-neutral-900">
         다트 게임
       </div>
 
@@ -26,13 +26,13 @@ export default function NameInput({
           onChange={(e) => onNameChange(e.target.value)}
           placeholder={`이름 입력 (${MAX_PLAYER_NAME_LENGTH}글자 이내)`}
           maxLength={MAX_PLAYER_NAME_LENGTH}
-          className="w-full py-4 px-5 text-lg text-center rounded-xl border-2 border-white/30 bg-white/10 text-white placeholder-white/50 backdrop-blur-sm focus:outline-none focus:border-white/50"
+          className="w-full rounded-xl border-2 border-black/10 bg-white/80 px-5 py-4 text-center text-lg text-neutral-900 placeholder:text-neutral-500 backdrop-blur-sm focus:border-neutral-400 focus:outline-none"
         />
-        <div className="text-sm text-white/70 text-center">
+        <div className="text-center text-sm text-neutral-600">
           이름은 {MAX_PLAYER_NAME_LENGTH}글자 이내로 입력해주세요.
         </div>
         {errorMessage && (
-          <div className="text-sm text-red-200 text-center">{errorMessage}</div>
+          <div className="text-center text-sm text-red-600">{errorMessage}</div>
         )}
       </div>
 

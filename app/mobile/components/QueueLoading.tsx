@@ -18,9 +18,9 @@ export default function QueueLoading({
   children,
 }: QueueLoadingProps) {
   return (
-    <div className="text-white text-center">
-      <div className="text-xl mb-2">{title}</div>
-      {message && <div className="text-sm opacity-80">{message}</div>}
+    <div className="text-center text-neutral-900">
+      <div className="mb-2 text-xl font-semibold">{title}</div>
+      {message && <div className="text-sm text-neutral-600">{message}</div>}
       {children}
       {actionLabel && onAction && (
         <button
