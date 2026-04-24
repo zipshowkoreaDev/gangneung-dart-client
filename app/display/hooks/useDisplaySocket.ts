@@ -19,21 +19,23 @@ import {
   removeDuplicateWaitingPlayers,
   resolveDisplayPlayerKey,
 } from "@/app/display/lib/playerState";
-import { getRouletteCenter, getRouletteRadius } from "../three/scoreMeasurement";
-import {
-  getHitScoreFromAim as getHitScoreFromAimBase,
-  DEFAULT_ROULETTE_RADIUS,
-} from "@/lib/score";
 import { clamp } from "@/lib/dartboardMath";
 import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import type { PlayerScore } from "@/app/display/types/player";
 import { stripDisplayName } from "@/lib/displayName";
 import { DISPLAY_EVENTS } from "@/lib/displayEvents";
 import type { TurnSyncState } from "@/app/shared/types/turnSync";
+import { getHitScoreFromAim } from "@/app/display/lib/displayScoring";
+import {
+  clearDisconnectedPlayers,
+  collectRemovedPlayerKeys,
+  createThrowFingerprint,
+  isRecentDuplicateThrow,
+  rememberThrowFingerprint,
+} from "@/app/display/lib/displaySocketSync";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
 const QUEUE_STATUS_INTERVAL_MS = 5000;
-const THROW_DUPLICATE_WINDOW_MS = 1000;
 
 interface UseDisplaySocketProps {
   room: string;
@@ -45,22 +47,6 @@ interface UseDisplaySocketProps {
     players: Array<{ name: string; score: number }>,
     gameId?: string
   ) => void;
-}
-
-function getCurrentRouletteRadius(): number {
-  const radius = getRouletteRadius();
-  if (Number.isFinite(radius) && radius > 0) {
-    return radius;
-  }
-  return DEFAULT_ROULETTE_RADIUS;
-}
-
-function getHitScoreFromAim(aim?: { x: number; y: number }): number {
-  return getHitScoreFromAimBase(
-    aim,
-    getCurrentRouletteRadius(),
-    getRouletteCenter()
-  );
 }
 
 export function useDisplaySocket({
@@ -174,19 +160,8 @@ export function useDisplaySocket({
 
       setPlayers((prev) => {
         const next = new Map(prev);
-        const joinedSocketIdSet = new Set(joinedSocketIds);
-
         if (Array.isArray(data.players)) {
-          Array.from(next.entries()).forEach(([key, player]) => {
-            if (!player.socketId || joinedSocketIdSet.has(player.socketId)) {
-              return;
-            }
-
-            if (player.isWaiting || player.isConnected) {
-              next.delete(key);
-              removedPlayerKeys.push(key);
-            }
-          });
+          removedPlayerKeys.push(...collectRemovedPlayerKeys(next, joinedSocketIds));
         }
 
         data.players?.forEach((joinedPlayer) => {
@@ -235,28 +210,14 @@ export function useDisplaySocket({
         return next;
       });
 
-      if (removedPlayerKeys.length > 0) {
-        const removedKeySet = new Set(removedPlayerKeys);
-
-        setAimPositions((prev) => {
-          const next = new Map(prev);
-          removedPlayerKeys.forEach((key) => next.delete(key));
-          return next;
-        });
-
-        removedPlayerKeys.forEach((key) => {
-          playerLastScoresRef.current.delete(key);
-          finishedPlayerKeysRef.current.delete(key);
-          playerAliasKeyRef.current.delete(key);
-          window.dispatchEvent(
-            new CustomEvent(DISPLAY_EVENTS.clearPlayerDarts, { detail: { key } })
-          );
-        });
-
-        onLog?.(
-          `Removed disconnected players: ${Array.from(removedKeySet).join(", ")}`
-        );
-      }
+      clearDisconnectedPlayers({
+        finishedPlayerKeys: finishedPlayerKeysRef.current,
+        playerAliases: playerAliasKeyRef.current,
+        playerLastScores: playerLastScoresRef.current,
+        removedPlayerKeys,
+        setAimPositions,
+        onLog,
+      });
     };
 
     const onRoomPlayerCount = (data: { room: string; playerCount: number }) => {
@@ -319,30 +280,18 @@ export function useDisplaySocket({
         return;
       }
 
-      const fingerprint = JSON.stringify({
+      const fingerprint = createThrowFingerprint({
         key,
         socketId: data.socketId,
         score: data.score,
-        aimX: Number((data.aim?.x ?? 0).toFixed(4)),
-        aimY: Number((data.aim?.y ?? 0).toFixed(4)),
+        aim: data.aim,
       });
       const now = Date.now();
-      const lastSeenAt = recentThrowFingerprintsRef.current.get(fingerprint);
-      if (
-        typeof lastSeenAt === "number" &&
-        now - lastSeenAt < THROW_DUPLICATE_WINDOW_MS
-      ) {
+      if (isRecentDuplicateThrow(recentThrowFingerprintsRef.current, fingerprint, now)) {
         onLog?.(`Ignored duplicate dart-thrown event: ${key}`);
         return;
       }
-      recentThrowFingerprintsRef.current.set(fingerprint, now);
-      Array.from(recentThrowFingerprintsRef.current.entries()).forEach(
-        ([existingFingerprint, seenAt]) => {
-          if (now - seenAt >= THROW_DUPLICATE_WINDOW_MS) {
-            recentThrowFingerprintsRef.current.delete(existingFingerprint);
-          }
-        }
-      );
+      rememberThrowFingerprint(recentThrowFingerprintsRef.current, fingerprint, now);
 
       if (!playersRef.current.has(key)) {
         const displayName = data.name ? stripDisplayName(data.name) : key;
@@ -535,25 +484,25 @@ export function useDisplaySocket({
               return prev;
             }
             const isBecomingReady = !existing.isReady && existing.totalThrows < 3;
-              next.set(key, {
-                ...existing,
-                slot: slot ?? existing.slot,
-                isConnected: true,
-                isReady: isRegistration ? existing.isReady : true,
+            next.set(key, {
+              ...existing,
+              slot: slot ?? existing.slot,
+              isConnected: true,
+              isReady: isRegistration ? existing.isReady : true,
               socketId: data.socketId ?? existing.socketId,
               serverName: data.name ?? existing.serverName,
-                name: displayName ?? existing.name,
-                isWaiting: false,
-                score: data.turnSyncState?.score ?? existing.score,
-                totalThrows:
-                  data.turnSyncState?.totalThrows ?? existing.totalThrows,
-                currentThrows:
-                  data.turnSyncState?.currentThrows ?? existing.currentThrows,
-                throwScores:
-                  data.turnSyncState?.throwScores ?? existing.throwScores,
-                dartDeadlineEndsAt: isBecomingReady
-                  ? Date.now() + DART_TIME_LIMIT_MS
-                  : existing.dartDeadlineEndsAt,
+              name: displayName ?? existing.name,
+              isWaiting: false,
+              score: data.turnSyncState?.score ?? existing.score,
+              totalThrows:
+                data.turnSyncState?.totalThrows ?? existing.totalThrows,
+              currentThrows:
+                data.turnSyncState?.currentThrows ?? existing.currentThrows,
+              throwScores:
+                data.turnSyncState?.throwScores ?? existing.throwScores,
+              dartDeadlineEndsAt: isBecomingReady
+                ? Date.now() + DART_TIME_LIMIT_MS
+                : existing.dartDeadlineEndsAt,
             });
             playersRef.current = next;
             return next;

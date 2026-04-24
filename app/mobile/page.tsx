@@ -14,6 +14,7 @@ import useMobileGameSession from "./hooks/useMobileGameSession";
 import useRadiusParam from "./hooks/useRadiusParam";
 import useQueueSessionFlow from "./hooks/useQueueSessionFlow";
 import useStartExitFlow from "./hooks/useStartExitFlow";
+import useWakeLock from "./hooks/useWakeLock";
 import SessionValidating from "./components/SessionValidating";
 import AccessDenied from "./components/AccessDenied";
 import NameInput from "./components/NameInput";
@@ -177,6 +178,7 @@ export default function MobilePage() {
   });
 
   usePageLeave({ joinedQueueRef });
+  useWakeLock({ enabled: isInGame && !gameFinished });
 
   useEffect(() => {
     if (!socketId || !hasFinishedTurn) return;
