@@ -146,7 +146,6 @@ export default function MobilePage() {
     });
 
   const {
-    aimPosition,
     sensorsReady,
     sensorError,
     throwsLeft,
@@ -471,7 +470,7 @@ export default function MobilePage() {
 
       {sessionValid === true && !hasFinishedTurn && isInGame && myTurn && (
         <GameScreen
-          aimPosition={aimPosition}
+          slot={assignedSlot}
           throwsLeft={throwsLeft}
           dartTimeLeft={dartTimeLeft}
           sensorsReady={sensorsReady}

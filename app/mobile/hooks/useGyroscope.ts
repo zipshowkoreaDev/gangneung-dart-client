@@ -72,7 +72,6 @@ export function useGyroscope({
       ? rouletteRadius
       : DEFAULT_ROULETTE_RADIUS;
 
-  const [aimPosition, setAimPosition] = useState({ x: 0, y: 0 });
   const [sensorsReady, setSensorsReady] = useState(false);
   const [sensorError, setSensorError] = useState("");
   const [throwsLeft, setThrowsLeft] = useState(3);
@@ -273,8 +272,6 @@ export function useGyroscope({
       const dy = Math.abs(y - lastAimRef.current.y);
 
       aimRef.current = { x, y };
-      setAimPosition({ x, y });
-
       if (throwCountRef.current >= 3) return;
 
       if (dx > 0.01 || dy > 0.01) {
@@ -336,7 +333,6 @@ export function useGyroscope({
   ]);
 
   return {
-    aimPosition,
     sensorsReady,
     sensorError,
     throwsLeft,

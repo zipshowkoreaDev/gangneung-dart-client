@@ -1,5 +1,8 @@
+import type { PlayerSlot } from "@/lib/room";
+import DartPreview from "./DartPreview";
+
 interface GameScreenProps {
-  aimPosition: { x: number; y: number };
+  slot: PlayerSlot | null;
   throwsLeft: number;
   dartTimeLeft: number;
   sensorsReady: boolean;
@@ -9,7 +12,7 @@ interface GameScreenProps {
 }
 
 export default function GameScreen({
-  aimPosition,
+  slot,
   throwsLeft,
   dartTimeLeft,
   sensorsReady,
@@ -20,26 +23,12 @@ export default function GameScreen({
   return (
     <div className="flex min-h-full w-full flex-col items-center justify-center py-4">
       <div className="shrink-0 text-center text-lg font-bold text-white">
-        <div>다트 게임</div>
+        <div>MY DART</div>
       </div>
 
-      {/* 자이로 조준 패드 */}
-      <div className="relative mt-4 h-[min(52dvh,440px)] min-h-[220px] w-[90%] max-w-[500px] shrink rounded-3xl border-[3px] border-white/30 bg-white/10 backdrop-blur-[10px]">
-        <div
-          className="absolute top-1/2 left-1/2 w-[60px] h-[60px] rounded-full border-4 border-[#FFD700] bg-[#FFD700]/30 pointer-events-none transition-transform duration-[50ms] ease-out"
-          style={{
-            transform: `translate(calc(-50% + ${aimPosition.x * 45}%), calc(-50% + ${aimPosition.y * 45}%))`,
-          }}
-        />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white text-sm opacity-50 pointer-events-none">
-          휴대폰을 기울여 조준하세요
-        </div>
-      </div>
+      <DartPreview slot={slot} />
 
-      <div className="mt-4 shrink-0 text-xs text-white opacity-60">
-        X: {aimPosition.x.toFixed(2)}, Y: {aimPosition.y.toFixed(2)}
-      </div>
-      <div className="mt-2 shrink-0 text-sm tracking-[6px] text-white opacity-80">
+      <div className="mt-5 shrink-0 text-sm tracking-[6px] text-white opacity-80">
         {Array.from({ length: 3 }).map((_, index) => (
           <span
             key={index}
