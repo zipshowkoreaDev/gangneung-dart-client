@@ -6,18 +6,22 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
 
+// Scene constants
 const DART_MODEL_SCALE = 24;
 const ROULETTE_MODEL_SCALE = 12;
 const ROULETTE_MODEL_POSITION: [number, number, number] = [0, 2, 0];
 const BACKDROP_PLANE_Z = -14;
 const BACKDROP_PLANE_SCALE = 1.08;
 const DART_MODEL_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
+const DART_FLIGHT_DURATION_MS = 700;
 const DART_MODEL_PATHS = [
   "/models/dart_blue.glb",
   "/models/dart_red.glb",
   "/models/dart_green.glb",
   "/models/dart_yellow.glb",
 ] as const;
+
+// Backdrop shaders
 const BACKDROP_VERTEX_SHADER = `
   varying vec2 vUv;
 
@@ -61,11 +65,46 @@ const BACKDROP_FRAGMENT_SHADER = `
   }
 `;
 
+// Shared scene types
 interface StuckDartProps {
   position: [number, number, number];
   modelPath: string;
 }
 
+interface FlyingDartProps {
+  targetPosition: [number, number, number];
+  modelPath: string;
+}
+
+interface ThrownDart {
+  id: string;
+  position: [number, number, number];
+  ownerKey: string;
+  modelPath: string;
+}
+
+interface FlyingDartData {
+  id: string;
+  position: [number, number, number];
+  ownerKey: string;
+  modelPath: string;
+}
+
+// Module-scoped cached geometry data
+let cachedRouletteRadius = 20;
+
+// Small scene helpers
+function getDartModelPath(ownerKey: string) {
+  const slotMatch = ownerKey.match(/^slot-([1-4])$/);
+  const slotIndex = slotMatch ? Number(slotMatch[1]) - 1 : 0;
+  return DART_MODEL_PATHS[slotIndex] ?? DART_MODEL_PATHS[0];
+}
+
+function createDartId() {
+  return `${Date.now()}-${Math.random()}`;
+}
+
+// Static dart mesh already stuck on the board
 function StuckDart({ position, modelPath }: StuckDartProps) {
   const { scene } = useGLTF(modelPath);
 
@@ -80,11 +119,7 @@ function StuckDart({ position, modelPath }: StuckDartProps) {
   );
 }
 
-interface FlyingDartProps {
-  targetPosition: [number, number, number];
-  modelPath: string;
-}
-
+// Animated dart travelling toward the board
 function FlyingDart({
   targetPosition,
   modelPath,
@@ -136,22 +171,7 @@ function FlyingDart({
   );
 }
 
-interface ThrownDart {
-  id: string;
-  position: [number, number, number];
-  ownerKey: string;
-  modelPath: string;
-}
-
-interface FlyingDartData {
-  id: string;
-  position: [number, number, number];
-  ownerKey: string;
-  modelPath: string;
-}
-
-let cachedRouletteRadius = 20;
-
+// Full-screen 3D backdrop behind the roulette
 function DepthBackdrop() {
   const { camera, size } = useThree();
   const { width, height } = useMemo(() => {
@@ -180,12 +200,7 @@ function DepthBackdrop() {
   );
 }
 
-function getDartModelPath(ownerKey: string) {
-  const slotMatch = ownerKey.match(/^slot-([1-4])$/);
-  const slotIndex = slotMatch ? Number(slotMatch[1]) - 1 : 0;
-  return DART_MODEL_PATHS[slotIndex] ?? DART_MODEL_PATHS[0];
-}
-
+// Roulette model and cached radius measurement
 function Roulette() {
   const { scene } = useGLTF("/models/roulette.glb");
   const rouletteScene = useMemo(() => scene.clone(true), [scene]);
@@ -215,6 +230,7 @@ export function getRouletteCenter(): { x: number; y: number } {
   };
 }
 
+// Converts throw events into world-space dart targets
 function DartEventHandler({
   onDartThrow,
 }: {
@@ -259,6 +275,7 @@ function DartEventHandler({
   return null;
 }
 
+// Scene composition and local dart state
 export default function Scene() {
   const [flyingDarts, setFlyingDarts] = useState<FlyingDartData[]>([]);
   const [stuckDarts, setStuckDarts] = useState<ThrownDart[]>([]);
@@ -291,7 +308,7 @@ export default function Scene() {
     position: [number, number, number],
     ownerKey: string,
   ) => {
-    const dartId = `${Date.now()}-${Math.random()}`;
+    const dartId = createDartId();
     const modelPath = getDartModelPath(ownerKey);
 
     setFlyingDarts((prev) => [
@@ -305,7 +322,7 @@ export default function Scene() {
         ...prev,
         { id: dartId, position, ownerKey, modelPath },
       ]);
-    }, 700);
+    }, DART_FLIGHT_DURATION_MS);
   };
 
   return (
@@ -346,5 +363,6 @@ export default function Scene() {
   );
 }
 
+// Preload frequently used models for smoother first throw
 useGLTF.preload("/models/roulette.glb");
 DART_MODEL_PATHS.forEach((path) => useGLTF.preload(path));

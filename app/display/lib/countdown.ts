@@ -1,4 +1,4 @@
-import type { PlayerScore } from "@/app/display/types";
+import type { PlayerScore } from "@/app/display/types/player";
 
 export function getTurnDelaySeconds(player: PlayerScore, now: number) {
   if (!player.turnDelayEndsAt) return 0;

@@ -1,5 +1,5 @@
-import type { PlayerScore } from "@/app/display/types";
-import { getPlayerColor } from "@/app/display/utils/playerColors";
+import type { PlayerScore } from "@/app/display/types/player";
+import { getPlayerColor } from "@/app/display/lib/playerColors";
 import { MAX_PLAYERS } from "@/lib/room";
 
 type ScoreboardProps = {

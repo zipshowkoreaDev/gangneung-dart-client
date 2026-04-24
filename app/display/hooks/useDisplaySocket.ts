@@ -9,6 +9,16 @@ import {
   MAX_PLAYERS,
   type PlayerSlot,
 } from "@/lib/room";
+import {
+  getPlayerSocketIds,
+  getQueuePlayerKey,
+} from "@/app/display/lib/playerKey";
+import {
+  getExistingPlayerEntry,
+  rememberPlayerAliases,
+  removeDuplicateWaitingPlayers,
+  resolveDisplayPlayerKey,
+} from "@/app/display/lib/playerState";
 import { getRouletteCenter, getRouletteRadius } from "../three/Scene";
 import {
   clamp,
@@ -16,7 +26,7 @@ import {
   DEFAULT_ROULETTE_RADIUS,
 } from "@/lib/score";
 import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
-import type { PlayerScore } from "@/app/display/types";
+import type { PlayerScore } from "@/app/display/types/player";
 import { stripDisplayName } from "@/lib/displayName";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
@@ -47,30 +57,6 @@ function getHitScoreFromAim(aim?: { x: number; y: number }): number {
     aim,
     getCurrentRouletteRadius(),
     getRouletteCenter()
-  );
-}
-
-function resolvePlayerKey(data: {
-  playerId?: string;
-  name?: string;
-  socketId?: string;
-}) {
-  return data.socketId || data.playerId || data.name || "player";
-}
-
-function getSlotPlayerKey(slot?: PlayerSlot) {
-  return slot ? `slot-${slot}` : undefined;
-}
-
-function getQueuePlayerKey(socketId: string) {
-  return `queue-${socketId}`;
-}
-
-function getPlayerSocketIds(players?: Array<{ socketId?: string }>): string[] {
-  return (
-    players
-      ?.map((player) => player.socketId)
-      .filter((socketId): socketId is string => Boolean(socketId)) ?? []
   );
 }
 
@@ -108,88 +94,6 @@ export function useDisplaySocket({
       if (!socketId) return undefined;
       const slotIndex = queuedPlayerIdsRef.current.indexOf(socketId);
       return slotIndex >= 0 ? ((slotIndex + 1) as PlayerSlot) : undefined;
-    };
-    const resolveDisplayPlayerKey = (data: {
-      room?: string;
-      playerId?: string;
-      name?: string;
-      socketId?: string;
-      slot?: PlayerSlot;
-    }) => {
-      const slotKey = getSlotPlayerKey(
-        data.slot ?? getQueuedSocketSlot(data.socketId)
-      );
-      if (slotKey) return slotKey;
-
-      const aliases = [data.socketId, data.playerId, data.name].filter(
-        Boolean
-      ) as string[];
-      for (const alias of aliases) {
-        const mappedKey = playerAliasKeyRef.current.get(alias);
-        if (mappedKey) return mappedKey;
-      }
-
-      return resolvePlayerKey(data);
-    };
-    const rememberPlayerAliases = (
-      key: string,
-      data: {
-        playerId?: string;
-        name?: string;
-        socketId?: string;
-      }
-    ) => {
-      [data.socketId, data.playerId, data.name]
-        .filter(Boolean)
-        .forEach((alias) => {
-          playerAliasKeyRef.current.set(alias as string, key);
-        });
-    };
-    const getExistingPlayerEntry = (
-      playersMap: Map<string, PlayerScore>,
-      key: string,
-      data: {
-        name?: string;
-        socketId?: string;
-      }
-    ): [string, PlayerScore] | undefined => {
-      const displayName = data.name ? stripDisplayName(data.name) : undefined;
-      const queueKey = data.socketId ? getQueuePlayerKey(data.socketId) : undefined;
-      const candidates = [key, queueKey].filter(Boolean) as string[];
-
-      for (const candidate of candidates) {
-        const player = playersMap.get(candidate);
-        if (player) return [candidate, player];
-      }
-
-      return Array.from(playersMap.entries()).find(
-        ([, player]) =>
-          (data.socketId && player.socketId === data.socketId) ||
-          (data.name && player.serverName === data.name) ||
-          (displayName && player.name === displayName)
-      );
-    };
-    const removeDuplicateWaitingPlayers = (
-      playersMap: Map<string, PlayerScore>,
-      keepKey: string,
-      socketId?: string
-    ) => {
-      if (!socketId) return;
-
-      const queueKey = getQueuePlayerKey(socketId);
-      if (queueKey !== keepKey) {
-        playersMap.delete(queueKey);
-      }
-
-      Array.from(playersMap.entries()).forEach(([entryKey, player]) => {
-        if (
-          entryKey !== keepKey &&
-          player.isWaiting &&
-          player.socketId === socketId
-        ) {
-          playersMap.delete(entryKey);
-        }
-      });
     };
 
     const logPlayerCount = (
@@ -292,7 +196,7 @@ export function useDisplaySocket({
           const [key, existing] = existingEntry;
           const slot =
             existing?.slot ?? getQueuedSocketSlot(joinedPlayer.socketId);
-          rememberPlayerAliases(key, {
+          rememberPlayerAliases(playerAliasKeyRef.current, key, {
             socketId: joinedPlayer.socketId,
             name: joinedPlayer.name,
           });
@@ -369,8 +273,11 @@ export function useDisplaySocket({
     }) => {
       if (!isRoomEvent(data.room)) return;
 
-      const key = resolveDisplayPlayerKey(data);
-      rememberPlayerAliases(key, data);
+      const key = resolveDisplayPlayerKey(data, {
+        aliasMap: playerAliasKeyRef.current,
+        getQueuedSocketSlot,
+      });
+      rememberPlayerAliases(playerAliasKeyRef.current, key, data);
       if (finishedPlayerKeysRef.current.has(key)) {
         onLog?.(`Ignored dart from finished player ${key}`);
         return;
@@ -465,8 +372,11 @@ export function useDisplaySocket({
     }) => {
       if (!isRoomEvent(data.room)) return;
 
-      const key = resolveDisplayPlayerKey(data);
-      rememberPlayerAliases(key, data);
+      const key = resolveDisplayPlayerKey(data, {
+        aliasMap: playerAliasKeyRef.current,
+        getQueuedSocketSlot,
+      });
+      rememberPlayerAliases(playerAliasKeyRef.current, key, data);
       const x = clamp(data.aim?.x ?? 0, -1, 1);
       const y = clamp(data.aim?.y ?? 0, -1, 1);
       const displayName = data.name ? stripDisplayName(data.name) : key;
@@ -476,7 +386,7 @@ export function useDisplaySocket({
 
       if (isQueueRegistration) {
         const waitingKey = data.socketId ? getQueuePlayerKey(data.socketId) : key;
-        rememberPlayerAliases(waitingKey, data);
+        rememberPlayerAliases(playerAliasKeyRef.current, waitingKey, data);
 
         setPlayers((prev) => {
           const next = new Map(prev);
@@ -624,8 +534,11 @@ export function useDisplaySocket({
     }) => {
       if (!isRoomEvent(data.room)) return;
 
-      const key = resolveDisplayPlayerKey(data);
-      rememberPlayerAliases(key, data);
+      const key = resolveDisplayPlayerKey(data, {
+        aliasMap: playerAliasKeyRef.current,
+        getQueuedSocketSlot,
+      });
+      rememberPlayerAliases(playerAliasKeyRef.current, key, data);
       setAimPositions((prev) => {
         const next = new Map(prev);
         next.delete(key);

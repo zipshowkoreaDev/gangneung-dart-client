@@ -1,7 +1,7 @@
 "use client";
 
 import { aimToDisplayPosition } from "@/lib/displayAimCoordinates";
-import { getPlayerColor } from "@/app/display/utils/playerColors";
+import { getPlayerColor } from "@/app/display/lib/playerColors";
 import type { PlayerSlot } from "@/lib/room";
 
 type AimPosition = {

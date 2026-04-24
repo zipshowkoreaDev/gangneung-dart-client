@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import type { PlayerScore } from "@/app/display/types";
+import type { PlayerScore } from "@/app/display/types/player";
 import {
   getDartTimeLeft,
   getTurnDelaySeconds,
-} from "@/app/display/utils/countdown";
+} from "@/app/display/lib/countdown";
 
 type CountdownDisplayProps = {
   players: Map<string, PlayerScore>;
