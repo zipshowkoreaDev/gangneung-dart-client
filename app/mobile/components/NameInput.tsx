@@ -28,9 +28,6 @@ export default function NameInput({
           maxLength={MAX_PLAYER_NAME_LENGTH}
           className="w-full rounded-xl border-2 border-black/10 bg-white/80 px-5 py-4 text-center text-lg text-neutral-900 placeholder:text-neutral-500 backdrop-blur-sm focus:border-neutral-400 focus:outline-none"
         />
-        <div className="text-center text-sm text-neutral-600">
-          이름은 {MAX_PLAYER_NAME_LENGTH}글자 이내로 입력해주세요.
-        </div>
         {errorMessage && (
           <div className="text-center text-sm text-red-600">{errorMessage}</div>
         )}

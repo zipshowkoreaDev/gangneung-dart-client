@@ -213,8 +213,14 @@ export function useDisplaySocket({
             totalThrows: existing?.totalThrows ?? 0,
             currentThrows: existing?.currentThrows ?? 0,
             throwScores: existing?.throwScores ?? [],
-            dartDeadlineEndsAt: existing?.dartDeadlineEndsAt,
-            turnDelayEndsAt: existing?.turnDelayEndsAt,
+            dartDeadlineEndsAt:
+              existing?.isReady && !existing?.isWaiting
+                ? existing.dartDeadlineEndsAt
+                : undefined,
+            turnDelayEndsAt:
+              existing?.isReady && !existing?.isWaiting
+                ? existing.turnDelayEndsAt
+                : undefined,
           });
         });
 

@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PlayerScore } from "@/app/display/types/player";
-import {
-  getDartTimeLeft,
-  getTurnDelaySeconds,
-} from "@/app/display/lib/countdown";
+import { getActiveCountdown } from "@/app/display/lib/countdown";
 
 type CountdownDisplayProps = {
   players: Map<string, PlayerScore>;
@@ -11,17 +8,10 @@ type CountdownDisplayProps = {
 
 export default function CountdownDisplay({ players }: CountdownDisplayProps) {
   const [now, setNow] = useState(() => Date.now());
-  const playerList = useMemo(() => Array.from(players.values()), [players]);
-  const activeCountdown = playerList
-    .map((player) => {
-      const turnDelaySeconds = getTurnDelaySeconds(player, now);
-      const dartTimeLeft = getDartTimeLeft(player, now);
-      return {
-        seconds: turnDelaySeconds || dartTimeLeft,
-        isWarning: turnDelaySeconds === 0 && dartTimeLeft <= 3,
-      };
-    })
-    .find((item) => item.seconds > 0);
+  const activeCountdown = useMemo(
+    () => getActiveCountdown(players.values(), now),
+    [players, now]
+  );
 
   useEffect(() => {
     if (!activeCountdown) return;
