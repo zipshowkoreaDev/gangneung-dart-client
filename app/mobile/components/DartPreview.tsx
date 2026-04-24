@@ -12,6 +12,7 @@ const DART_MODEL_PATHS: Record<PlayerSlot, string> = {
   3: "/models/dart_green.glb",
   4: "/models/dart_yellow.glb",
 };
+const BASE_DART_SCALE = 27;
 
 function DartModel({
   path,
@@ -57,7 +58,7 @@ function DartModel({
     groupRef.current.position.x = 0;
     groupRef.current.position.y = forwardOffset;
     groupRef.current.position.z = 0;
-    groupRef.current.scale.setScalar(18 + scaleBoost);
+    groupRef.current.scale.setScalar(BASE_DART_SCALE + scaleBoost);
   });
 
   return (
