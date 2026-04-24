@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { socket } from "@/shared/socket";
 import type { PlayerSlot } from "@/lib/room";
-import { debugLog } from "@/app/mobile/debugLog";
+import { debugLog } from "@/app/mobile/lib/debugLog";
 
 interface UseMobileSocketProps {
   room: string;

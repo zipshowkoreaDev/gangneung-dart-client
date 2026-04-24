@@ -1,18 +1,19 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useMobileSocket } from "./hooks/useMobileSocket";
-import { useGyroscope } from "./hooks/useGyroscope";
 import { getQRSession } from "@/lib/session";
 import { getRoomFromUrl, MAX_PLAYERS, type PlayerSlot } from "@/lib/room";
+import { TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import { socket } from "@/shared/socket";
+import { useMobileSocket } from "./hooks/useMobileSocket";
+import { useGyroscope } from "./hooks/useGyroscope";
 import { usePageLeave } from "./hooks/usePageLeave";
 import useNameInputFlow from "./hooks/useNameInputFlow";
 import useGameLifecycle from "./hooks/useGameLifecycle";
+import useMobileGameSession from "./hooks/useMobileGameSession";
 import useRadiusParam from "./hooks/useRadiusParam";
 import useQueueSessionFlow from "./hooks/useQueueSessionFlow";
 import useStartExitFlow from "./hooks/useStartExitFlow";
-import { TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import SessionValidating from "./components/SessionValidating";
 import AccessDenied from "./components/AccessDenied";
 import NameInput from "./components/NameInput";
@@ -20,19 +21,6 @@ import GameScreen from "./components/GameScreen";
 import ResultScreen from "./components/ResultScreen";
 import WaitingScreen from "./components/WaitingScreen";
 import QueueLoading from "./components/QueueLoading";
-
-type ScoreEntry = {
-  socketId: string;
-  name: string;
-  score: number;
-};
-type ControllerGameResult = {
-  result: "win" | "lose" | "tie";
-  score: number;
-  rank: number;
-  totalPlayers: number;
-};
-const GAME_END_COUNTDOWN_SECONDS = 5;
 
 export default function MobilePage() {
   const [sessionValid] = useState<boolean | null>(() =>
@@ -52,50 +40,57 @@ export default function MobilePage() {
   const [assignedSlot, setAssignedSlot] = useState<PlayerSlot | null>(null);
   const [startError, setStartError] = useState("");
   const [gamePlayers, setGamePlayers] = useState<string[]>([]);
-  const [finishedPlayers, setFinishedPlayers] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [playerScores, setPlayerScores] = useState<Map<string, ScoreEntry>>(
-    () => new Map(),
-  );
-  const [gameResult, setGameResult] = useState<ControllerGameResult | null>(
-    null,
-  );
-  const [endCountdown, setEndCountdown] = useState<number | null>(null);
   const [canJoinCurrentGame, setCanJoinCurrentGame] = useState<boolean | null>(
     null,
   );
   const finishGameEmittedRef = useRef(false);
-  const gameCleanupEmittedRef = useRef(false);
-  const resetRoundState = useCallback(() => {
-    setFinishedPlayers(new Set());
-    setPlayerScores(new Map());
-    setGameResult(null);
-    setEndCountdown(null);
-    finishGameEmittedRef.current = false;
-    gameCleanupEmittedRef.current = false;
-  }, []);
+  const gameCleanupRef = useRef(false);
 
-  const handlePlayerFinished = useCallback((playerId: string) => {
-    setFinishedPlayers((prev) => {
-      if (prev.has(playerId)) return prev;
-      const next = new Set(prev);
-      next.add(playerId);
-      return next;
-    });
-  }, []);
-  const handlePlayerScored = useCallback((player: ScoreEntry) => {
-    setPlayerScores((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(player.socketId);
-      next.set(player.socketId, {
-        socketId: player.socketId,
-        name: player.name,
-        score: (existing?.score ?? 0) + player.score,
-      });
-      return next;
-    });
-  }, []);
+  const {
+    isInQueue,
+    queuePosition,
+    queueSnapshot,
+    waitingPlayers,
+    isWaitingForApproval: hasApprovalWait,
+    isHost,
+    canStartGame,
+    hostApprovalTimeLeft,
+    joinedQueueRef,
+    connectAndJoinQueue,
+    leaveQueue,
+    startGame,
+  } = useQueueSessionFlow({
+    room,
+    name: socketName,
+    isInGame,
+    setAssignedSlot,
+    setHasJoined,
+    setIsInGame,
+    setGamePlayers,
+  });
+
+  const {
+    endCountdown,
+    finishedPlayers,
+    gameFinished,
+    gameResult,
+    handlePlayerFinished,
+    handlePlayerScored,
+    handleSocketGameFinished,
+    playerScores,
+    resetRoundState: resetSessionRoundState,
+    setGameResult,
+  } = useMobileGameSession({
+    isInGame,
+    gamePlayers,
+  });
+
+  const resetRoundState = useCallback(() => {
+    resetSessionRoundState();
+    finishGameEmittedRef.current = false;
+    gameCleanupRef.current = false;
+  }, [resetSessionRoundState]);
+
   const handleRoomFull = useCallback(
     (data: { room?: string; maxPlayers?: number }) => {
       setStartError(
@@ -111,6 +106,7 @@ export default function MobilePage() {
     },
     [resetRoundState],
   );
+
   const handleRoomPlayersUpdated = useCallback(
     (data: {
       playerCount: number;
@@ -120,9 +116,6 @@ export default function MobilePage() {
     },
     [],
   );
-  const handleSocketGameFinished = useCallback(() => {
-    gameCleanupEmittedRef.current = true;
-  }, []);
 
   const {
     emitAimUpdate,
@@ -132,18 +125,18 @@ export default function MobilePage() {
     leaveGame,
     socketId,
   } = useMobileSocket({
-      room,
-      name: socketName,
-      enabled: hasJoined,
-      slot: assignedSlot,
-      roomJoinedBeforeGame: true,
-      onPlayerFinished: handlePlayerFinished,
-      onPlayerScored: handlePlayerScored,
-      onGameResult: setGameResult,
-      onRoomFull: handleRoomFull,
-      onRoomPlayersUpdated: handleRoomPlayersUpdated,
-      onGameFinished: handleSocketGameFinished,
-    });
+    room,
+    name: socketName,
+    enabled: hasJoined,
+    slot: assignedSlot,
+    roomJoinedBeforeGame: true,
+    onPlayerFinished: handlePlayerFinished,
+    onPlayerScored: handlePlayerScored,
+    onGameResult: setGameResult,
+    onRoomFull: handleRoomFull,
+    onRoomPlayersUpdated: handleRoomPlayersUpdated,
+    onGameFinished: handleSocketGameFinished,
+  });
 
   const {
     sensorsReady,
@@ -165,30 +158,47 @@ export default function MobilePage() {
   });
 
   const {
-    isInQueue,
-    queuePosition,
-    queueSnapshot,
-    waitingPlayers,
-    isWaitingForApproval: hasApprovalWait,
-    isHost,
-    canStartGame,
-    hostApprovalTimeLeft,
-    joinedQueueRef,
+    handleStart,
+    handleExit,
+    handleRequestPermission,
+  } = useStartExitFlow({
+    errorMessage,
+    setStartError,
+    requestMotionPermission,
     connectAndJoinQueue,
+    resetName,
     leaveQueue,
-    startGame,
-  } = useQueueSessionFlow({
-    room,
-    name: socketName,
-    isInGame,
-    resetRoundState,
-    setAssignedSlot,
-    setHasJoined,
+    leaveGame,
+    stopSensors,
+    setHasFinishedTurn,
     setIsInGame,
-    setGamePlayers,
+    setHasJoined,
+    startSensors,
   });
 
   usePageLeave({ joinedQueueRef });
+
+  useEffect(() => {
+    if (!socketId || !hasFinishedTurn) return;
+
+    const timerId = window.setTimeout(() => {
+      handlePlayerScored({
+        socketId,
+        name: socketName,
+        score: totalScore,
+      });
+      handlePlayerFinished(socketId);
+    }, TURN_RESULT_DELAY_MS);
+
+    return () => window.clearTimeout(timerId);
+  }, [
+    handlePlayerFinished,
+    handlePlayerScored,
+    hasFinishedTurn,
+    socketId,
+    socketName,
+    totalScore,
+  ]);
 
   useEffect(() => {
     if (sessionValid !== true || isInQueue || isInGame) return;
@@ -232,75 +242,11 @@ export default function MobilePage() {
       socket.off("game-finished", handleGameEnded);
       socket.off("reset-queue", handleGameEnded);
     };
-  }, [isInGame, isInQueue, room, sessionValid]);
+  }, [isInGame, isInQueue, room, sessionValid, setGameResult]);
 
   useGameLifecycle({
     stopSensors,
   });
-
-  const { handleStart, handleExit, handleRequestPermission } = useStartExitFlow(
-    {
-      errorMessage,
-      setStartError,
-      requestMotionPermission,
-      connectAndJoinQueue,
-      resetName,
-      leaveQueue,
-      leaveGame,
-      stopSensors,
-      setHasFinishedTurn,
-      setIsInGame,
-      setHasJoined,
-      startSensors,
-    },
-  );
-
-  const myPlayerIndex = useMemo(
-    () => (socketId ? gamePlayers.indexOf(socketId) : -1),
-    [gamePlayers, socketId],
-  );
-  const myTurn =
-    isInGame &&
-    !hasFinishedTurn &&
-    myPlayerIndex >= 0 &&
-    gamePlayers
-      .slice(0, myPlayerIndex)
-      .every((playerId) => finishedPlayers.has(playerId));
-  const gameFinished =
-    isInGame &&
-    gamePlayers.length > 0 &&
-    gamePlayers.every((playerId) => finishedPlayers.has(playerId));
-
-  useEffect(() => {
-    if (!socketId || !hasFinishedTurn) return;
-    const timerId = window.setTimeout(() => {
-      setPlayerScores((prev) => {
-        const next = new Map(prev);
-        next.set(socketId, {
-          socketId,
-          name: socketName,
-          score: totalScore,
-        });
-        return next;
-      });
-      handlePlayerFinished(socketId);
-    }, TURN_RESULT_DELAY_MS);
-    return () => window.clearTimeout(timerId);
-  }, [socketId, socketName, hasFinishedTurn, totalScore, handlePlayerFinished]);
-
-  useEffect(() => {
-    if (!myTurn || sensorsReady) return;
-    startSensors();
-  }, [myTurn, sensorsReady, startSensors]);
-
-  useEffect(() => {
-    if (!gameFinished || endCountdown !== null) return;
-    const timer = window.setTimeout(
-      () => setEndCountdown(GAME_END_COUNTDOWN_SECONDS),
-      0,
-    );
-    return () => window.clearTimeout(timer);
-  }, [gameFinished, endCountdown]);
 
   useEffect(() => {
     if (!gameFinished || finishGameEmittedRef.current) return;
@@ -320,29 +266,41 @@ export default function MobilePage() {
   }, [gameFinished, gamePlayers, playerScores, room, socketId]);
 
   useEffect(() => {
-    if (!gameFinished || gameCleanupEmittedRef.current) return;
+    if (!gameFinished || gameCleanupRef.current) return;
 
-    gameCleanupEmittedRef.current = true;
+    gameCleanupRef.current = true;
     cleanupGameSocket("game finished");
     leaveQueue();
   }, [cleanupGameSocket, gameFinished, leaveQueue]);
 
   useEffect(() => {
-    if (endCountdown === null) return;
-    if (endCountdown <= 0) {
-      const timer = window.setTimeout(() => {
-        handleExit();
-        setGamePlayers([]);
-        resetRoundState();
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
-    const timer = window.setTimeout(
-      () => setEndCountdown((prev) => (prev === null ? null : prev - 1)),
-      1000,
-    );
+    if (endCountdown === null || endCountdown > 0) return;
+
+    const timer = window.setTimeout(() => {
+      handleExit();
+      setGamePlayers([]);
+      resetRoundState();
+    }, 0);
+
     return () => window.clearTimeout(timer);
   }, [endCountdown, handleExit, resetRoundState]);
+
+  const myPlayerIndex = useMemo(
+    () => (socketId ? gamePlayers.indexOf(socketId) : -1),
+    [gamePlayers, socketId],
+  );
+  const myTurn =
+    isInGame &&
+    !hasFinishedTurn &&
+    myPlayerIndex >= 0 &&
+    gamePlayers
+      .slice(0, myPlayerIndex)
+      .every((playerId) => finishedPlayers.has(playerId));
+
+  useEffect(() => {
+    if (!myTurn || sensorsReady) return;
+    startSensors();
+  }, [myTurn, sensorsReady, startSensors]);
 
   const handleNameChange = useCallback(
     (value: string) => {
@@ -383,7 +341,9 @@ export default function MobilePage() {
     return (
       <div className="mt-6 w-[min(82vw,320px)] rounded-xl border border-black/10 bg-white/65 p-4 text-left shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-md">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-semibold text-neutral-700">참가자 대기 목록</span>
+          <span className="text-sm font-semibold text-neutral-700">
+            참가자 대기 목록
+          </span>
           <span className="rounded-md bg-black/6 px-2 py-1 text-xs font-bold text-neutral-600 tabular-nums">
             {waitingPlayers.length}/{MAX_PLAYERS}
           </span>

@@ -1,4 +1,4 @@
-import { MAX_PLAYER_NAME_LENGTH } from "../constants";
+import { MAX_PLAYER_NAME_LENGTH } from "../lib/constants";
 
 interface NameInputProps {
   name: string;

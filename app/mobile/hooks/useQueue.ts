@@ -7,7 +7,7 @@ import {
   MAX_PLAYERS,
   type PlayerSlot,
 } from "@/lib/room";
-import { debugLog } from "@/app/mobile/debugLog";
+import { debugLog } from "@/app/mobile/lib/debugLog";
 import { stripDisplayName } from "@/lib/displayName";
 
 const QUEUE_TIMEOUT_MS = 2 * 60 * 1000;

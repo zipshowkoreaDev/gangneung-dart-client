@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useQueue } from "@/app/mobile/hooks/useQueue";
-import { debugLog } from "@/app/mobile/debugLog";
+import { debugLog } from "@/app/mobile/lib/debugLog";
 import type { PlayerSlot } from "@/lib/room";
 import type { WaitingPlayer } from "@/app/mobile/hooks/useQueue";
 
@@ -8,7 +8,6 @@ type UseQueueSessionFlowParams = {
   room: string;
   name: string;
   isInGame: boolean;
-  resetRoundState: () => void;
   setAssignedSlot: (value: PlayerSlot | null) => void;
   setHasJoined: (value: boolean) => void;
   setIsInGame: (value: boolean) => void;
@@ -34,7 +33,6 @@ export default function useQueueSessionFlow({
   room,
   name,
   isInGame,
-  resetRoundState,
   setAssignedSlot,
   setHasJoined,
   setIsInGame,
@@ -43,13 +41,12 @@ export default function useQueueSessionFlow({
   const handleEnterGame = useCallback(
     (slot: PlayerSlot, players: string[]) => {
       debugLog(`✅ 게임 입장, 슬롯: ${slot}`);
-      resetRoundState();
       setAssignedSlot(slot);
       setHasJoined(true);
       setIsInGame(true);
       setGamePlayers(players);
     },
-    [resetRoundState, setAssignedSlot, setHasJoined, setIsInGame, setGamePlayers]
+    [setAssignedSlot, setHasJoined, setIsInGame, setGamePlayers]
   );
 
   const {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import useProfanityCheck from "./useProfanityCheck";
-import { MAX_PLAYER_NAME_LENGTH } from "../constants";
+import { MAX_PLAYER_NAME_LENGTH } from "../lib/constants";
 
 type UseNameInputFlowReturn = {
   name: string;
