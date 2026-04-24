@@ -54,8 +54,8 @@ function DartModel({
 
     groupRef.current.rotation.y = elapsed * 0.8;
     groupRef.current.rotation.x = Math.sin(elapsed * 1.2) * 0.1;
-    groupRef.current.position.x = -forwardOffset;
-    groupRef.current.position.y = 0;
+    groupRef.current.position.x = 0;
+    groupRef.current.position.y = forwardOffset;
     groupRef.current.position.z = 0;
     groupRef.current.scale.setScalar(18 + scaleBoost);
   });
