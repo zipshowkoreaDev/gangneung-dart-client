@@ -22,10 +22,6 @@ export default function GameScreen({
 }: GameScreenProps) {
   return (
     <div className="flex min-h-full w-full flex-col items-center justify-center py-4">
-      <div className="shrink-0 text-center text-lg font-bold text-white">
-        <div>MY DART</div>
-      </div>
-
       <DartPreview slot={slot} />
 
       <div className="mt-5 shrink-0 text-sm tracking-[6px] text-white opacity-80">
