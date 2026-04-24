@@ -20,9 +20,11 @@ export default function GameScreen({
   onRequestPermission,
   onCalibrate,
 }: GameScreenProps) {
+  const throwCount = 3 - throwsLeft;
+
   return (
     <div className="flex min-h-full w-full flex-col items-center justify-center py-4">
-      <DartPreview slot={slot} />
+      <DartPreview slot={slot} throwCount={throwCount} />
 
       <div className="mt-5 shrink-0 text-sm tracking-[6px] text-white opacity-80">
         {Array.from({ length: 3 }).map((_, index) => (
