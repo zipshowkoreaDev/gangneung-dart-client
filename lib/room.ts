@@ -1,4 +1,4 @@
-const DEFAULT_ROOM = process.env.NEXT_PUBLIC_ROOM ?? "zipshow";
+export const DEFAULT_ROOM = process.env.NEXT_PUBLIC_ROOM ?? "zipshow";
 export const MAX_PLAYERS = 4;
 export type PlayerSlot = 1 | 2 | 3 | 4;
 

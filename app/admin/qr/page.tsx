@@ -2,11 +2,10 @@
 
 import { useState, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { DEFAULT_ROOM } from "@/lib/room";
 import { getBaseUrl } from "@/lib/url";
 import { generateSessionToken } from "@/lib/session";
 import { socket } from "@/shared/socket";
-
-const FIXED_ROOM = "zipshow";
 
 interface QRData {
   url: string;
@@ -14,19 +13,23 @@ interface QRData {
 }
 
 export default function AdminQRPage() {
-  const buildQrCode = (createdAt: number): QRData => {
+  const buildQrCode = useCallback((createdAt: number): QRData => {
     const baseUrl = getBaseUrl();
     const token = generateSessionToken();
-    const params = new URLSearchParams({ room: FIXED_ROOM });
+    const params = new URLSearchParams({ room: DEFAULT_ROOM });
+
     if (typeof window !== "undefined") {
       const radius = new URLSearchParams(window.location.search).get("radius");
       if (radius) {
         params.set("radius", radius);
       }
     }
-    const url = `${baseUrl}/auth/${token}?${params.toString()}`;
-    return { url, createdAt };
-  };
+
+    return {
+      url: `${baseUrl}/auth/${token}?${params.toString()}`,
+      createdAt,
+    };
+  }, []);
 
   const [qrCode, setQrCode] = useState<QRData | null>(() => {
     if (typeof window === "undefined") return null;
@@ -35,27 +38,27 @@ export default function AdminQRPage() {
 
   const generateQRCodes = useCallback(() => {
     setQrCode(buildQrCode(Date.now()));
-  }, []);
+  }, [buildQrCode]);
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
     alert("클립보드에 복사되었습니다!");
-  };
+  }, []);
 
-  const resetQueue = () => {
+  const resetQueue = useCallback(() => {
     const confirmed = window.confirm(
       "현재 대기열과 진행 상태를 전체 초기화할까요?",
     );
     if (!confirmed) return;
 
     if (!socket.connected) {
-      socket.io.opts.query = { room: FIXED_ROOM, name: "_admin" };
+      socket.io.opts.query = { room: DEFAULT_ROOM, name: "_admin" };
       socket.connect();
     }
 
     socket.emit("reset-queue", { project: "dart" });
     alert("전체 리셋 요청을 보냈습니다.");
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-8">
@@ -65,7 +68,7 @@ export default function AdminQRPage() {
             현장 접속 QR
           </h1>
           <p className="text-gray-400">
-            &quot;{FIXED_ROOM}&quot; 체험을 위한 현장 한정 QR 코드
+            &quot;{DEFAULT_ROOM}&quot; 체험을 위한 현장 한정 QR 코드
           </p>
         </div>
 
@@ -116,7 +119,7 @@ export default function AdminQRPage() {
                         Room ID
                       </div>
                       <div className="text-xl font-bold text-white">
-                        {FIXED_ROOM}
+                        {DEFAULT_ROOM}
                       </div>
                     </div>
 
@@ -160,7 +163,7 @@ export default function AdminQRPage() {
           <ol className="text-yellow-100 text-sm space-y-2 list-decimal list-inside">
             <li>위 QR 코드를 현장에 배치합니다</li>
             <li>플레이어가 QR 코드를 스캔하면 세션이 발급됩니다</li>
-            <li>플레이어는 {FIXED_ROOM} 룸의 대기열에 입장합니다</li>
+            <li>플레이어는 {DEFAULT_ROOM} 룸의 대기열에 입장합니다</li>
             <li>Display는 해당 룸을 구독하여 게임을 표시합니다</li>
             <li>
               새로운 QR 코드가 필요하면 &quot;새 QR 코드 생성&quot; 버튼을
