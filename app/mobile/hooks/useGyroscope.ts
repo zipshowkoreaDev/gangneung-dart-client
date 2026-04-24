@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   DEFAULT_ROULETTE_RADIUS,
   getScoreFromZone,
+  getSectorValueFromAim,
   getZoneFromAim,
   type Zone,
 } from "@/lib/score";
@@ -24,7 +25,13 @@ const RELEASE_THRESHOLD_WITH_GRAVITY = 15;
 const THRESHOLD_WITHOUT_GRAVITY = 18;
 const RELEASE_THRESHOLD_WITHOUT_GRAVITY = 8;
 
-export type HitZone = "bull" | "single" | "triple" | "double" | "miss";
+export type HitZone =
+  | "inner_bull"
+  | "outer_bull"
+  | "single"
+  | "triple"
+  | "double"
+  | "miss";
 
 interface HitResult {
   zone: HitZone;
@@ -55,9 +62,10 @@ function getHitResult(
   rouletteRadius: number
 ): HitResult {
   const zone = getZoneFromAim(aim, rouletteRadius);
+  const sectorValue = getSectorValueFromAim(aim);
   return {
     zone: toHitZone(zone),
-    score: getScoreFromZone(zone),
+    score: getScoreFromZone(zone, sectorValue),
   };
 }
 

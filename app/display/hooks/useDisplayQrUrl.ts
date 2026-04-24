@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { generateSessionToken } from "@/lib/session";
-import { getRouletteRadius } from "../three/Scene";
+import { getRouletteRadius } from "../three/scoreMeasurement";
 
 const ROOM = process.env.NEXT_PUBLIC_ROOM ?? "zipshow";
 

@@ -5,11 +5,14 @@ import { useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
+import {
+  SCORE_MEASUREMENT_CENTER,
+  setRouletteRadius,
+} from "./scoreMeasurement";
 
 // Scene constants
 const DART_MODEL_SCALE = 24;
 const ROULETTE_MODEL_SCALE = 12;
-const ROULETTE_MODEL_POSITION: [number, number, number] = [0, 2, 0];
 const BACKDROP_PLANE_Z = -14;
 const BACKDROP_PLANE_SCALE = 1.08;
 const DART_MODEL_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
@@ -89,9 +92,6 @@ interface FlyingDartData {
   ownerKey: string;
   modelPath: string;
 }
-
-// Module-scoped cached geometry data
-let cachedRouletteRadius = 20;
 
 // Small scene helpers
 function getDartModelPath(ownerKey: string) {
@@ -208,26 +208,14 @@ function Roulette() {
   useEffect(() => {
     const box = new THREE.Box3().setFromObject(rouletteScene);
     const size = box.getSize(new THREE.Vector3());
-    cachedRouletteRadius =
-      (Math.max(size.x, size.y) / 2) * ROULETTE_MODEL_SCALE;
+    setRouletteRadius((Math.max(size.x, size.y) / 2) * ROULETTE_MODEL_SCALE);
   }, [rouletteScene]);
 
   return (
-    <group position={ROULETTE_MODEL_POSITION} scale={ROULETTE_MODEL_SCALE}>
+    <group position={SCORE_MEASUREMENT_CENTER} scale={ROULETTE_MODEL_SCALE}>
       <primitive object={rouletteScene} />
     </group>
   );
-}
-
-export function getRouletteRadius(): number {
-  return cachedRouletteRadius;
-}
-
-export function getRouletteCenter(): { x: number; y: number } {
-  return {
-    x: ROULETTE_MODEL_POSITION[0],
-    y: ROULETTE_MODEL_POSITION[1],
-  };
 }
 
 // Converts throw events into world-space dart targets

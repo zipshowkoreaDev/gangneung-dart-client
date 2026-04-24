@@ -19,7 +19,7 @@ import {
   removeDuplicateWaitingPlayers,
   resolveDisplayPlayerKey,
 } from "@/app/display/lib/playerState";
-import { getRouletteCenter, getRouletteRadius } from "../three/Scene";
+import { getRouletteCenter, getRouletteRadius } from "../three/scoreMeasurement";
 import {
   clamp,
   getHitScoreFromAim as getHitScoreFromAimBase,
