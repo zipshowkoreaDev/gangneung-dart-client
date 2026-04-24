@@ -21,13 +21,14 @@ import {
 } from "@/app/display/lib/playerState";
 import { getRouletteCenter, getRouletteRadius } from "../three/scoreMeasurement";
 import {
-  clamp,
   getHitScoreFromAim as getHitScoreFromAimBase,
   DEFAULT_ROULETTE_RADIUS,
 } from "@/lib/score";
+import { clamp } from "@/lib/dartboardMath";
 import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import type { PlayerScore } from "@/app/display/types/player";
 import { stripDisplayName } from "@/lib/displayName";
+import { DISPLAY_EVENTS } from "@/lib/displayEvents";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
 const QUEUE_STATUS_INTERVAL_MS = 5000;
@@ -388,7 +389,7 @@ export function useDisplaySocket({
       }
 
       window.dispatchEvent(
-        new CustomEvent("DART_THROW", {
+        new CustomEvent(DISPLAY_EVENTS.dartThrow, {
           detail: { ...data, playerId: key, score },
         })
       );
@@ -459,7 +460,7 @@ export function useDisplaySocket({
 
       const startsNewGame = isRegistration ? resetAggregationForNewGame() : false;
       if (startsNewGame) {
-        window.dispatchEvent(new CustomEvent("GAME_STARTED"));
+        window.dispatchEvent(new CustomEvent(DISPLAY_EVENTS.gameStarted));
       }
 
       if (key) {
@@ -630,7 +631,7 @@ export function useDisplaySocket({
 
         window.setTimeout(() => {
           window.dispatchEvent(
-            new CustomEvent("CLEAR_PLAYER_DARTS", { detail: { key } })
+            new CustomEvent(DISPLAY_EVENTS.clearPlayerDarts, { detail: { key } })
           );
         }, TURN_RESULT_DELAY_MS);
       }
@@ -699,7 +700,7 @@ export function useDisplaySocket({
         name: stripDisplayName(player.name),
       }));
       window.dispatchEvent(
-        new CustomEvent("GAME_FINISHED", {
+        new CustomEvent(DISPLAY_EVENTS.gameFinished, {
           detail: { ...data, ranking: displayRanking },
         })
       );
@@ -713,14 +714,14 @@ export function useDisplaySocket({
         queuedPlayerIdsRef.current = uniquePlayers;
         onLog?.(`Game started with expected players: ${uniquePlayers.length}`);
       }
-      window.dispatchEvent(new CustomEvent("GAME_STARTED"));
+      window.dispatchEvent(new CustomEvent(DISPLAY_EVENTS.gameStarted));
     };
 
     const onResetQueue = () => {
       resetSessionRefs();
       queuedPlayerIdsRef.current = [];
       clearDisplayState();
-      window.dispatchEvent(new CustomEvent("RESET_SCENE"));
+      window.dispatchEvent(new CustomEvent(DISPLAY_EVENTS.resetScene));
     };
 
     socket.on("connect", onConnect);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { FinishedPlayer } from "@/app/display/types/events";
 import type { PlayerScore } from "@/app/display/types/player";
+import { DISPLAY_EVENTS } from "@/lib/displayEvents";
 
 const GAME_END_COUNTDOWN_SECONDS = 5;
 
@@ -61,14 +62,14 @@ export default function useDisplayGameSession({
       setEndCountdown(GAME_END_COUNTDOWN_SECONDS);
     };
 
-    window.addEventListener("DART_THROW", handleDartThrow);
-    window.addEventListener("GAME_STARTED", handleGameStarted);
-    window.addEventListener("GAME_FINISHED", handleGameFinished);
+    window.addEventListener(DISPLAY_EVENTS.dartThrow, handleDartThrow);
+    window.addEventListener(DISPLAY_EVENTS.gameStarted, handleGameStarted);
+    window.addEventListener(DISPLAY_EVENTS.gameFinished, handleGameFinished);
 
     return () => {
-      window.removeEventListener("DART_THROW", handleDartThrow);
-      window.removeEventListener("GAME_STARTED", handleGameStarted);
-      window.removeEventListener("GAME_FINISHED", handleGameFinished);
+      window.removeEventListener(DISPLAY_EVENTS.dartThrow, handleDartThrow);
+      window.removeEventListener(DISPLAY_EVENTS.gameStarted, handleGameStarted);
+      window.removeEventListener(DISPLAY_EVENTS.gameFinished, handleGameFinished);
     };
   }, []);
 
@@ -85,7 +86,7 @@ export default function useDisplayGameSession({
         isShowingGameFinishedRef.current = false;
         setPlayers(new Map());
         setAimPositions(new Map());
-        window.dispatchEvent(new CustomEvent("RESET_SCENE"));
+        window.dispatchEvent(new CustomEvent(DISPLAY_EVENTS.resetScene));
       }, 0);
 
       return () => window.clearTimeout(timer);

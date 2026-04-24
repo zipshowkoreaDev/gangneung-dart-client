@@ -5,6 +5,7 @@ import { useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { aimToCanvasNdc } from "@/lib/displayAimCoordinates";
+import { DISPLAY_EVENTS } from "@/lib/displayEvents";
 import {
   SCORE_MEASUREMENT_CENTER,
   setRouletteRadius,
@@ -256,8 +257,8 @@ function DartEventHandler({
       onDartThrow(targetPosition, ownerKey);
     };
 
-    window.addEventListener("DART_THROW", handleThrow);
-    return () => window.removeEventListener("DART_THROW", handleThrow);
+    window.addEventListener(DISPLAY_EVENTS.dartThrow, handleThrow);
+    return () => window.removeEventListener(DISPLAY_EVENTS.dartThrow, handleThrow);
   }, [camera, onDartThrow]);
 
   return null;
@@ -273,8 +274,8 @@ export default function Scene() {
       setFlyingDarts([]);
       setStuckDarts([]);
     };
-    window.addEventListener("RESET_SCENE", handleReset);
-    return () => window.removeEventListener("RESET_SCENE", handleReset);
+    window.addEventListener(DISPLAY_EVENTS.resetScene, handleReset);
+    return () => window.removeEventListener(DISPLAY_EVENTS.resetScene, handleReset);
   }, []);
 
   useEffect(() => {
@@ -287,9 +288,9 @@ export default function Scene() {
       setStuckDarts((prev) => prev.filter((dart) => dart.ownerKey !== key));
     };
 
-    window.addEventListener("CLEAR_PLAYER_DARTS", handleClearPlayerDarts);
+    window.addEventListener(DISPLAY_EVENTS.clearPlayerDarts, handleClearPlayerDarts);
     return () =>
-      window.removeEventListener("CLEAR_PLAYER_DARTS", handleClearPlayerDarts);
+      window.removeEventListener(DISPLAY_EVENTS.clearPlayerDarts, handleClearPlayerDarts);
   }, []);
 
   const handleDartThrow = (

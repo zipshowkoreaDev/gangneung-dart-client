@@ -7,23 +7,10 @@ import {
   type Zone,
 } from "@/lib/score";
 import { DART_TIME_LIMIT_MS, TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
-
-const AIM_HZ = 30;
-const AIM_INTERVAL = 1000 / AIM_HZ;
-const THROW_COOL_DOWN_MS = 700;
-const OUT_OF_BOUNDS_AIM = { x: 2, y: 2 };
-
-// 조준 각도 범위
-const GAMMA_RANGE = 40; // X축 ±40도
-const BETA_RANGE = 35;  // Y축 ±35도
-const DEFAULT_NEUTRAL_BETA = 30; // 기본 영점 (약간 위로 들림)
-const DEFAULT_NEUTRAL_GAMMA = 0;
-
-// 던짐 감지 임계값 (iOS: 중력 포함 / Android: 중력 제외)
-const THRESHOLD_WITH_GRAVITY = 28;
-const RELEASE_THRESHOLD_WITH_GRAVITY = 15;
-const THRESHOLD_WITHOUT_GRAVITY = 18;
-const RELEASE_THRESHOLD_WITHOUT_GRAVITY = 8;
+import {
+  AIM_INTERVAL_MS,
+  GYROSCOPE_CONFIG,
+} from "@/app/mobile/lib/gyroscopeConfig";
 
 export type HitZone =
   | "inner_bull"
@@ -79,6 +66,12 @@ export function useGyroscope({
     typeof rouletteRadius === "number" && rouletteRadius > 0
       ? rouletteRadius
       : DEFAULT_ROULETTE_RADIUS;
+  const {
+    aim,
+    outOfBoundsAim,
+    throwCoolDownMs,
+    throwDetection,
+  } = GYROSCOPE_CONFIG;
 
   const [sensorsReady, setSensorsReady] = useState(false);
   const [sensorError, setSensorError] = useState("");
@@ -99,9 +92,12 @@ export function useGyroscope({
   const turnFinishTimerIdRef = useRef<number | null>(null);
   const startDartTimerRef = useRef<() => void>(() => {});
 
-  const neutralBetaRef = useRef(DEFAULT_NEUTRAL_BETA);
-  const neutralGammaRef = useRef(DEFAULT_NEUTRAL_GAMMA);
-  const currentOriRef = useRef({ beta: DEFAULT_NEUTRAL_BETA, gamma: DEFAULT_NEUTRAL_GAMMA });
+  const neutralBetaRef = useRef<number>(aim.defaultNeutralBeta);
+  const neutralGammaRef = useRef<number>(aim.defaultNeutralGamma);
+  const currentOriRef = useRef<{ beta: number; gamma: number }>({
+    beta: aim.defaultNeutralBeta,
+    gamma: aim.defaultNeutralGamma,
+  });
 
   const isTrackingRef = useRef(false);
   const peakMagRef = useRef(0);
@@ -201,9 +197,9 @@ export function useGyroscope({
       if (remainingMs > 0) return;
 
       clearDartTimer();
-      completeThrow({ zone: "miss", score: 0 }, OUT_OF_BOUNDS_AIM);
+      completeThrow({ zone: "miss", score: 0 }, outOfBoundsAim);
     }, 250);
-  }, [clearDartTimer, completeThrow]);
+  }, [clearDartTimer, completeThrow, outOfBoundsAim]);
 
   useEffect(() => {
     startDartTimerRef.current = startDartTimer;
@@ -267,13 +263,13 @@ export function useGyroscope({
     clearTurnFinishTimer();
 
     handleOrientationRef.current = (e: DeviceOrientationEvent) => {
-      const beta = e.beta ?? DEFAULT_NEUTRAL_BETA;
-      const gamma = e.gamma ?? DEFAULT_NEUTRAL_GAMMA;
+      const beta = e.beta ?? aim.defaultNeutralBeta;
+      const gamma = e.gamma ?? aim.defaultNeutralGamma;
 
       currentOriRef.current = { beta, gamma };
 
-      const x = clamp((gamma - neutralGammaRef.current) / GAMMA_RANGE);
-      const y = -clamp((beta - neutralBetaRef.current) / BETA_RANGE);
+      const x = clamp((gamma - neutralGammaRef.current) / aim.gammaRange);
+      const y = -clamp((beta - neutralBetaRef.current) / aim.betaRange);
 
       // 변화가 미미하면 emit 생략
       const dx = Math.abs(x - lastAimRef.current.x);
@@ -282,9 +278,9 @@ export function useGyroscope({
       aimRef.current = { x, y };
       if (throwCountRef.current >= 3) return;
 
-      if (dx > 0.01 || dy > 0.01) {
+      if (dx > aim.minDeltaToEmit || dy > aim.minDeltaToEmit) {
         const now = performance.now();
-        if (now - lastAimSentRef.current > AIM_INTERVAL) {
+        if (now - lastAimSentRef.current > AIM_INTERVAL_MS) {
           lastAimSentRef.current = now;
           lastAimRef.current = { x, y };
           emitAimUpdate({ x, y });
@@ -300,8 +296,12 @@ export function useGyroscope({
       const acc = e.acceleration ?? e.accelerationIncludingGravity ?? { x: 0, y: 0, z: 0 };
       const mag = Math.hypot(acc.x ?? 0, acc.y ?? 0, acc.z ?? 0);
 
-      const threshold = usingGravity ? THRESHOLD_WITH_GRAVITY : THRESHOLD_WITHOUT_GRAVITY;
-      const releaseThreshold = usingGravity ? RELEASE_THRESHOLD_WITH_GRAVITY : RELEASE_THRESHOLD_WITHOUT_GRAVITY;
+      const threshold = usingGravity
+        ? throwDetection.withGravity.threshold
+        : throwDetection.withoutGravity.threshold;
+      const releaseThreshold = usingGravity
+        ? throwDetection.withGravity.releaseThreshold
+        : throwDetection.withoutGravity.releaseThreshold;
 
       if (!isTrackingRef.current) {
         if (mag > threshold) {
@@ -315,7 +315,7 @@ export function useGyroscope({
 
         if (mag < releaseThreshold) {
           isTrackingRef.current = false;
-          throwBlockedUntilRef.current = now + THROW_COOL_DOWN_MS;
+          throwBlockedUntilRef.current = now + throwCoolDownMs;
 
           const hitResult = getHitResult(aimRef.current, currentRouletteRadius);
           clearDartTimer();
@@ -335,9 +335,12 @@ export function useGyroscope({
     clearDartTimer,
     clearTurnFinishTimer,
     completeThrow,
+    aim,
     emitAimUpdate,
     currentRouletteRadius,
     startDartTimer,
+    throwCoolDownMs,
+    throwDetection,
   ]);
 
   return {

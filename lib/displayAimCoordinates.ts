@@ -1,5 +1,5 @@
 import { DISPLAY_CANVAS_Y_OFFSET } from "@/lib/displayLayout";
-import { clamp } from "@/lib/score";
+import { clamp } from "@/lib/dartboardMath";
 
 type Aim = { x: number; y: number };
 
