@@ -157,6 +157,7 @@ export function useLobby({
 
     const syncLobbyState = (
       players: Array<{ socketId: string; name: string }> | undefined,
+      playerCount?: number,
     ) => {
       const incomingSocketIds = Array.from(
         new Set(
@@ -165,17 +166,24 @@ export function useLobby({
             .filter((socketId): socketId is string => Boolean(socketId)),
         ),
       );
-      const incomingSocketIdSet = new Set(incomingSocketIds);
-      const preservedOrder = lobbyOrderRef.current.filter((socketId) =>
-        incomingSocketIdSet.has(socketId),
+      const expectedPlayerCount = Math.min(
+        Math.max(playerCount ?? incomingSocketIds.length, 0),
+        MAX_PLAYERS,
       );
+      const hasFullSnapshot =
+        incomingSocketIds.length >= expectedPlayerCount ||
+        lobbyOrderRef.current.length === 0;
+      const incomingSocketIdSet = new Set(incomingSocketIds);
+      const preservedOrder = hasFullSnapshot
+        ? lobbyOrderRef.current.filter((socketId) => incomingSocketIdSet.has(socketId))
+        : lobbyOrderRef.current.slice(0, expectedPlayerCount);
       const appendedOrder = incomingSocketIds.filter(
         (socketId) => !preservedOrder.includes(socketId),
       );
-      const lobbySocketIds = [...preservedOrder, ...appendedOrder].slice(
-        0,
-        MAX_PLAYERS,
-      );
+      const maxLength = hasFullSnapshot
+        ? MAX_PLAYERS
+        : Math.max(preservedOrder.length, expectedPlayerCount);
+      const lobbySocketIds = [...preservedOrder, ...appendedOrder].slice(0, maxLength);
       lobbyOrderRef.current = lobbySocketIds;
 
       debugLog(`[Lobby] players: ${JSON.stringify(lobbySocketIds)}`);
@@ -194,7 +202,7 @@ export function useLobby({
         });
 
         Array.from(next.keys()).forEach((socketId) => {
-          if (!currentSocketIds.has(socketId)) {
+          if (hasFullSnapshot && !currentSocketIds.has(socketId)) {
             next.delete(socketId);
             changed = true;
           }
@@ -267,7 +275,7 @@ export function useLobby({
         debugLog("[Lobby] joinedRoom without players snapshot - ignored");
         return;
       }
-      syncLobbyState(data.players);
+      syncLobbyState(data.players, data.playerCount);
     };
 
     const onStatusUpdate = (status: "pending" | "play" | "finish") => {

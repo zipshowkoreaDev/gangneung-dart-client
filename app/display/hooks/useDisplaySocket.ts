@@ -171,26 +171,37 @@ export function useDisplaySocket({
       const joinedSocketIds = getPlayerSocketIds(data.players);
       const removedPlayerKeys: string[] = [];
       if (joinedSocketIds.length > 0) {
-        const currentSocketIds = new Set(joinedSocketIds);
-        const preservedOrder = waitingPlayerOrderRef.current.filter((socketId) =>
-          currentSocketIds.has(socketId),
+        const expectedPlayerCount = Math.min(
+          Math.max(data.playerCount ?? joinedSocketIds.length, 0),
+          MAX_PLAYERS,
         );
+        const hasFullSnapshot =
+          joinedSocketIds.length >= expectedPlayerCount ||
+          waitingPlayerOrderRef.current.length === 0;
+        const currentSocketIds = new Set(joinedSocketIds);
+        const preservedOrder = hasFullSnapshot
+          ? waitingPlayerOrderRef.current.filter((socketId) =>
+              currentSocketIds.has(socketId),
+            )
+          : waitingPlayerOrderRef.current.slice(0, expectedPlayerCount);
         const appendedOrder = joinedSocketIds.filter(
           (socketId) => !preservedOrder.includes(socketId),
         );
+        const maxLength = hasFullSnapshot
+          ? MAX_PLAYERS
+          : Math.max(preservedOrder.length, expectedPlayerCount);
         waitingPlayerIdsRef.current = [...preservedOrder, ...appendedOrder].slice(
           0,
-          MAX_PLAYERS,
+          maxLength,
         );
         waitingPlayerOrderRef.current = waitingPlayerIdsRef.current;
+        if (Array.isArray(data.players) && hasFullSnapshot) {
+          removedPlayerKeys.push(...collectRemovedPlayerKeys(new Map(playersRef.current), joinedSocketIds));
+        }
       }
 
       setPlayers((prev) => {
         const next = new Map(prev);
-        if (Array.isArray(data.players)) {
-          removedPlayerKeys.push(...collectRemovedPlayerKeys(next, joinedSocketIds));
-        }
-
         data.players?.forEach((joinedPlayer) => {
           if (!joinedPlayer.socketId) return;
 
