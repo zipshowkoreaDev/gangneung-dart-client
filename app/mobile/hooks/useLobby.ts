@@ -60,13 +60,15 @@ export function useLobby({
   const [hostApprovalTimeLeft, setHostApprovalTimeLeft] = useState<number | null>(
     null,
   );
+  const [hostApprovalDeadline, setHostApprovalDeadline] = useState<number | null>(
+    null,
+  );
   const joinedLobbyRef = useRef(false);
   const lastRejoinAtRef = useRef(0);
   const lobbyStartAtRef = useRef<number | null>(null);
   const lastJoinedSocketIdRef = useRef<string | null>(null);
   const startRequestedRef = useRef(false);
   const lobbyPlayersRef = useRef<string[]>([]);
-  const hostApprovalDeadlineRef = useRef<number | null>(null);
   const joinedRoomRef = useRef(false);
 
   const clearApprovalWait = useCallback(() => {
@@ -74,7 +76,7 @@ export function useLobby({
     setIsHost(false);
     setCanStartGame(false);
     setHostApprovalTimeLeft(null);
-    hostApprovalDeadlineRef.current = null;
+    setHostApprovalDeadline(null);
   }, []);
 
   const leaveLobby = useCallback(() => {
@@ -93,7 +95,6 @@ export function useLobby({
     setCanStartGame(false);
     setHostApprovalTimeLeft(null);
     lobbyStartAtRef.current = null;
-    hostApprovalDeadlineRef.current = null;
     startRequestedRef.current = false;
     clearApprovalWait();
   }, [clearApprovalWait, room]);
@@ -239,18 +240,19 @@ export function useLobby({
         setCanStartGame(host && !startRequestedRef.current);
         setIsWaitingForApproval(true);
         if (host && !startRequestedRef.current) {
-          hostApprovalDeadlineRef.current ??=
-            Date.now() + HOST_APPROVAL_TIMEOUT_MS;
+          const deadline =
+            hostApprovalDeadline ?? Date.now() + HOST_APPROVAL_TIMEOUT_MS;
+          setHostApprovalDeadline(deadline);
           setHostApprovalTimeLeft(
             Math.max(
               0,
               Math.ceil(
-                (hostApprovalDeadlineRef.current - Date.now()) / 1000,
+                (deadline - Date.now()) / 1000,
               ),
             ),
           );
         } else {
-          hostApprovalDeadlineRef.current = null;
+          setHostApprovalDeadline(null);
           setHostApprovalTimeLeft(null);
         }
 
@@ -350,29 +352,12 @@ export function useLobby({
       }
     }, 5000);
 
-    const hostApprovalTimerId = window.setInterval(() => {
-      const deadline = hostApprovalDeadlineRef.current;
-
-      if (!deadline || !joinedLobbyRef.current || startRequestedRef.current) {
-        return;
-      }
-
-      const timeLeft = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setHostApprovalTimeLeft(timeLeft);
-
-      if (timeLeft <= 0) {
-        debugLog("[Lobby] host approval timeout - leave room");
-        leaveLobby();
-      }
-    }, 250);
-
     if (socket.connected) {
       onConnect();
     }
 
     return () => {
       window.clearInterval(timeoutId);
-      window.clearInterval(hostApprovalTimerId);
       clearApprovalWait();
       socket.off("connect", onConnect);
       socket.off("connect_error", onConnectError);
@@ -382,7 +367,45 @@ export function useLobby({
       socket.off(GAME_STARTED_EVENT, onGameStarted);
       socket.off("aim-update", onAimUpdate);
     };
-  }, [isInLobby, isInGame, name, onEnterGame, room, leaveLobby, clearApprovalWait]);
+  }, [
+    clearApprovalWait,
+    hostApprovalDeadline,
+    isInGame,
+    isInLobby,
+    leaveLobby,
+    name,
+    onEnterGame,
+    room,
+  ]);
+
+  useEffect(() => {
+    if (
+      !isInLobby ||
+      isInGame ||
+      !isHost ||
+      !joinedLobbyRef.current ||
+      hostApprovalDeadline === null
+    ) {
+      return;
+    }
+
+    const updateTimeLeft = () => {
+      const timeLeft = Math.max(
+        0,
+        Math.ceil((hostApprovalDeadline - Date.now()) / 1000),
+      );
+      setHostApprovalTimeLeft(timeLeft);
+
+      if (timeLeft <= 0) {
+        debugLog("[Lobby] host approval timeout - leave room");
+        leaveLobby();
+      }
+    };
+
+    updateTimeLeft();
+    const timerId = window.setInterval(updateTimeLeft, 250);
+    return () => window.clearInterval(timerId);
+  }, [hostApprovalDeadline, isHost, isInGame, isInLobby, leaveLobby]);
 
   const waitingPlayers =
     lobbyPlayers?.slice(0, MAX_PLAYERS).map((socketId, index) => ({
@@ -406,7 +429,7 @@ export function useLobby({
     startRequestedRef.current = true;
     setCanStartGame(false);
     setHostApprovalTimeLeft(null);
-    hostApprovalDeadlineRef.current = null;
+    setHostApprovalDeadline(null);
     debugLog(`[Lobby] host start-game: ${JSON.stringify(players)}`);
     socket.emit(START_GAME_EVENT, { room, players });
     socket.emit(GAME_STARTED_EVENT, { room, players });

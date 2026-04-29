@@ -483,7 +483,10 @@ export function useDisplaySocket({
           });
         }
 
-        if (Array.isArray(data.turnSyncState?.thrownAims)) {
+        if (
+          isRegistration &&
+          Array.isArray(data.turnSyncState?.thrownAims)
+        ) {
           window.dispatchEvent(
             new CustomEvent(DISPLAY_EVENTS.syncPlayerDarts, {
               detail: { key, aims: data.turnSyncState.thrownAims },
