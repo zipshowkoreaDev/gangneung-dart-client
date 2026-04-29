@@ -194,9 +194,6 @@ export function useMobileSocket({
     const handleGameFinished = (data: { room?: string }) => {
       if (data.room && data.room !== room) return;
       gameEndedRef.current = true;
-      if (currentRoomRef.current) {
-        socket.emit("leaveRoom", { room: currentRoomRef.current });
-      }
       onGameFinishedRef.current?.();
     };
     const handleRoomFull = (data: { room?: string; maxPlayers?: number }) => {
@@ -273,22 +270,18 @@ export function useMobileSocket({
     };
   }, [room, name, enabled, slot, roomJoinedBeforeGame, syncCurrentSocketId]);
 
-  const leaveJoinedRooms = useCallback((reason: string) => {
-    if (!socket.connected) return;
-    if (!currentRoomRef.current) return;
-    debugLog(`[Socket] leaveRoom (${reason}): ${currentRoomRef.current}`);
-    socket.emit("leaveRoom", { room: currentRoomRef.current });
-  }, []);
-
   // unmount 시 정리
   useEffect(() => {
     return () => {
-      leaveJoinedRooms("unmount");
+      if (socket.connected) {
+        debugLog("[Socket] disconnect (unmount)");
+        socket.disconnect();
+      }
       hasJoinedRef.current = false;
       currentRoomRef.current = "";
       turnSyncStateRef.current = INITIAL_TURN_SYNC_STATE;
     };
-  }, [leaveJoinedRooms]);
+  }, []);
 
   const emitAimUpdate = useCallback(
     (
@@ -357,7 +350,6 @@ export function useMobileSocket({
 
   const leaveGame = useCallback(() => {
     if (socket.connected) {
-      leaveJoinedRooms("game exit");
       if (currentRoomRef.current) {
         socket.emit("aim-off", {
           room: currentRoomRef.current,
@@ -365,6 +357,8 @@ export function useMobileSocket({
           name,
         });
       }
+      debugLog("[Socket] disconnect (game exit)");
+      socket.disconnect();
     }
 
     throwCountRef.current = 0;
@@ -373,7 +367,7 @@ export function useMobileSocket({
     slotRef.current = null;
     gameEndedRef.current = true;
     turnSyncStateRef.current = INITIAL_TURN_SYNC_STATE;
-  }, [leaveJoinedRooms, name]);
+  }, [name]);
 
   return {
     emitAimUpdate,

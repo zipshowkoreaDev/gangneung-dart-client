@@ -60,6 +60,7 @@ export function useDisplaySocket({
   const onPlayersFinishRef = useRef(onPlayersFinish);
   const gameFinishedHandledRef = useRef(false);
   const gameIdRef = useRef(0);
+  const roomStatusRef = useRef<"pending" | "play" | "finish" | null>(null);
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
   const playerAliasKeyRef = useRef<Map<string, string>>(new Map());
   const waitingPlayerIdsRef = useRef<string[]>([]);
@@ -102,6 +103,13 @@ export function useDisplaySocket({
       setAimPositions(new Map());
       setPlayers(new Map());
       playersRef.current = new Map();
+    };
+    const markGameStarted = () => {
+      if (roomStatusRef.current === "play") return;
+      roomStatusRef.current = "play";
+      resetSessionRefs();
+      clearDisplayState();
+      window.dispatchEvent(new CustomEvent(DISPLAY_EVENTS.gameStarted));
     };
 
     if (!socket.connected) {
@@ -240,6 +248,14 @@ export function useDisplaySocket({
 
     const onRoomPlayerCount = (data: { room: string; playerCount: number }) => {
       logPlayerCount("Player count", data);
+    };
+    const onStatusUpdate = (status: "pending" | "play" | "finish") => {
+      roomStatusRef.current = status;
+      onLog?.(`Room status: ${status}`);
+
+      if (status === "play") {
+        markGameStarted();
+      }
     };
 
     const onDartThrown = (data: {
@@ -642,15 +658,9 @@ export function useDisplaySocket({
       );
     };
 
-    const onGameStarted = (data: { players?: string[] }) => {
-      resetSessionRefs();
-      clearDisplayState();
-      if (Array.isArray(data.players)) {
-        const uniquePlayers = Array.from(new Set(data.players)).filter(Boolean);
-        waitingPlayerIdsRef.current = uniquePlayers;
-        onLog?.(`Game started with expected players: ${uniquePlayers.length}`);
-      }
-      window.dispatchEvent(new CustomEvent(DISPLAY_EVENTS.gameStarted));
+    const onGameStarted = () => {
+      onLog?.("Game started");
+      markGameStarted();
     };
 
     socket.on("connect", onConnect);
@@ -658,12 +668,13 @@ export function useDisplaySocket({
     socket.on("clientInfo", onClientInfo);
     socket.on("joinedRoom", onJoinedRoom);
     socket.on("roomPlayerCount", onRoomPlayerCount);
+    socket.on("statusUpdate", onStatusUpdate);
     socket.on("dart-thrown", onDartThrown);
     socket.on("aim-update", onAimUpdate);
     socket.on("aim-off", onAimOff);
     socket.on("game-result", onGameResult);
     socket.on("game-finished", onGameFinished);
-    socket.on("game-started", onGameStarted);
+    socket.on("gameStarted", onGameStarted);
 
     return () => {
       socket.off("connect", onConnect);
@@ -671,18 +682,19 @@ export function useDisplaySocket({
       socket.off("clientInfo", onClientInfo);
       socket.off("joinedRoom", onJoinedRoom);
       socket.off("roomPlayerCount", onRoomPlayerCount);
+      socket.off("statusUpdate", onStatusUpdate);
       socket.off("dart-thrown", onDartThrown);
       socket.off("aim-update", onAimUpdate);
       socket.off("aim-off", onAimOff);
       socket.off("game-result", onGameResult);
       socket.off("game-finished", onGameFinished);
-      socket.off("game-started", onGameStarted);
+      socket.off("gameStarted", onGameStarted);
     };
   }, [
     room,
-    onLog,
-    setAimPositions,
-    setPlayers,
+      onLog,
+      setAimPositions,
+      setPlayers,
   ]);
 
   return {};

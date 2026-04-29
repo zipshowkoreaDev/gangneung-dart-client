@@ -495,7 +495,8 @@ socket.on('joinedRoom', (data) =&gt; console.log('joined', data));</code></pre>
 
         <div class="hint">
           <b>제한</b>: 방 이름 최대 64자, 이름 최대 32자, 방당 최대 4명. 초과 시
-          <code class="inline">roomFull</code> 이벤트가 해당 클라이언트에게만 발행됩니다.
+          <code class="inline">roomFull</code> 이벤트가 해당 클라이언트에게만 발행됩니다.<br>
+          <b>이미 같은 방에 있는 본인의 재-<code class="inline">joinRoom</code></b>(이름 변경/재연결 등)은 정원 체크에서 제외되어 정상 처리됩니다.
         </div>
       </section>
 
@@ -602,6 +603,44 @@ socket.emit('throw-dart', { room, name, aim: { x: 0.5, y: 0.3 }, score: 50 });</
           </div>
         </div>
 
+        <!-- startGame -->
+        <div class="event" id="emit-startGame">
+          <div class="event-title"><span class="pill emit">EMIT</span><code>startGame</code></div>
+          <p class="desc">게임 시작. 방의 인원이 1명 이상일 때 서버가 방의 상태를 <code class="inline">play</code>로 전환하고
+            방 전체에 <code class="inline">gameStarted</code> 및 <code class="inline">statusUpdate</code>('play')를 브로드캐스트.</p>
+          <pre><code>// payload: 없음 (서버는 발신자 소켓이 속한 방을 자동으로 찾음)
+socket.emit('startGame');</code></pre>
+          <div class="event-actions">
+            <button class="emit" onclick="socketEmit('startGame')">emit startGame</button>
+          </div>
+        </div>
+
+        <!-- gameOver -->
+        <div class="event" id="emit-gameOver">
+          <div class="event-title"><span class="pill emit">EMIT</span><code>gameOver</code></div>
+          <p class="desc">게임 종료. 서버가 방의 상태를 <code class="inline">finish</code>로 전환하고
+            <code class="inline">statusUpdate</code>('finish')를 방 전체에 브로드캐스트.</p>
+          <pre><code>// payload (모두 선택)
+{ winnerId?: string | null, reason?: string }
+
+socket.emit('gameOver', { winnerId: 'abc123', reason: 'manual' });</code></pre>
+          <div class="event-actions">
+            <div class="grid2">
+              <div>
+                <label>winnerId</label>
+                <input id="e-go-winner" placeholder="(선택) 우승자 socketId" />
+              </div>
+              <div>
+                <label>reason</label>
+                <input id="e-go-reason" placeholder="manual" />
+              </div>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <button class="emit" onclick="sendGameOver()">emit gameOver</button>
+            </div>
+          </div>
+        </div>
+
         <!-- finish-game -->
         <div class="event" id="emit-finish-game">
           <div class="event-title"><span class="pill emit">EMIT</span><code>finish-game</code></div>
@@ -630,6 +669,37 @@ socket.emit('finish-game', {
           </div>
         </div>
 
+        <!-- join-queue -->
+        <div class="event" id="emit-join-queue">
+          <div class="event-title"><span class="pill emit">EMIT</span><code>join-queue</code></div>
+          <p class="desc">대기열(큐)에 자신의 소켓 ID 추가. 서버는 전역으로
+            <code class="inline">status-queue</code>를 브로드캐스트.</p>
+          <pre><code>socket.emit('join-queue');   // no payload</code></pre>
+          <div class="event-actions">
+            <button class="emit" onclick="socketEmit('join-queue')">emit join-queue</button>
+          </div>
+        </div>
+
+        <!-- leave-queue -->
+        <div class="event" id="emit-leave-queue">
+          <div class="event-title"><span class="pill emit">EMIT</span><code>leave-queue</code></div>
+          <p class="desc">대기열에서 나간다.</p>
+          <pre><code>socket.emit('leave-queue');  // no payload</code></pre>
+          <div class="event-actions">
+            <button class="emit" onclick="socketEmit('leave-queue')">emit leave-queue</button>
+          </div>
+        </div>
+
+        <!-- status-queue -->
+        <div class="event" id="emit-status-queue">
+          <div class="event-title"><span class="pill emit">EMIT</span><code>status-queue</code></div>
+          <p class="desc">현재 큐 상태를 <b>요청한 클라이언트에게만</b> 반환 (브로드캐스트 아님).</p>
+          <pre><code>socket.emit('status-queue');
+socket.on('status-queue', (queue) =&gt; console.log(queue));</code></pre>
+          <div class="event-actions">
+            <button class="emit" onclick="socketEmit('status-queue')">emit status-queue</button>
+          </div>
+        </div>
       </section>
 
       <!-- ========== LISTEN Events ========== -->
@@ -660,6 +730,28 @@ socket.emit('finish-game', {
         </div>
 
         <div class="event">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>statusUpdate</code></div>
+          <p class="desc">방 상태가 바뀔 때마다 방 전체에 발행. payload는 단일 문자열.
+            <code class="inline">joinRoom</code> → <code class="inline">'pending'</code>,
+            <code class="inline">startGame</code> → <code class="inline">'play'</code>,
+            <code class="inline">gameOver</code> → <code class="inline">'finish'</code>.</p>
+          <pre><code>'pending' | 'play' | 'finish'</code></pre>
+        </div>
+
+        <div class="event">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>gameStarted</code></div>
+          <p class="desc"><code class="inline">startGame</code> 직후 방 전체에 발행 (payload 없음).
+            <code class="inline">statusUpdate</code>('play')와 함께 도착.</p>
+          <pre><code>// payload 없음</code></pre>
+        </div>
+
+        <div class="event">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>error</code></div>
+          <p class="desc"><code class="inline">startGame</code> 실패 등 서버 오류. 발신자 소켓에게만 발행.</p>
+          <pre><code>{ code: 'NOT_ENOUGH_PLAYERS', message: string }</code></pre>
+        </div>
+
+        <div class="event">
           <div class="event-title"><span class="pill listen">LISTEN</span><code>game-result</code></div>
           <p class="desc"><code class="inline">finish-game</code> 후 방 전체에 전송. 각 소켓ID별 개인 결과 +
             전체 랭킹 포함. 클라이언트는 자신의 socketId 항목만 UI로 표시.</p>
@@ -683,6 +775,11 @@ socket.emit('finish-game', {
           <pre><code>{ room: string, ranking: Array&lt;{ name, score, rank }&gt; }</code></pre>
         </div>
 
+        <div class="event">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>status-queue</code></div>
+          <p class="desc">큐 변경(join/leave) 시 <b>모든 클라이언트</b>에게 브로드캐스트.</p>
+          <pre><code>string[]   // socketId 배열</code></pre>
+        </div>
       </section>
     </div>
 
@@ -731,7 +828,12 @@ socket.emit('finish-game', {
           <a href="#emit-aim-update">EMIT · aim-update</a>
           <a href="#emit-aim-off">EMIT · aim-off</a>
           <a href="#emit-throw-dart">EMIT · throw-dart</a>
+          <a href="#emit-startGame">EMIT · startGame</a>
+          <a href="#emit-gameOver">EMIT · gameOver</a>
           <a href="#emit-finish-game">EMIT · finish-game</a>
+          <a href="#emit-join-queue">EMIT · join-queue</a>
+          <a href="#emit-leave-queue">EMIT · leave-queue</a>
+          <a href="#emit-status-queue">EMIT · status-queue</a>
         </nav>
       </section>
     </aside>
@@ -750,8 +852,12 @@ socket.emit('finish-game', {
       'joinedRoom',
       'roomPlayerCount',
       'roomFull',
+      'statusUpdate',
+      'gameStarted',
+      'error',
       'game-result',
       'game-finished',
+      'status-queue',
     ];
 
     function log(dir, ev, payload) {
@@ -875,6 +981,12 @@ socket.emit('finish-game', {
       const y = parseFloat($('e-th-y').value);
       const score = parseFloat($('e-th-score').value);
       socketEmit('throw-dart', { room, name, aim: { x, y }, score });
+    }
+
+    function sendGameOver() {
+      const winnerId = $('e-go-winner').value.trim() || null;
+      const reason = $('e-go-reason').value.trim() || 'manual';
+      socketEmit('gameOver', { winnerId, reason });
     }
 
     function sendFinishGame() {

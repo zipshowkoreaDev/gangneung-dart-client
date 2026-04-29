@@ -556,6 +556,10 @@ socket.on('game-finished', (d) =&gt; renderRanking(d.ranking));</code></pre>
           Controller와 달리 <code class="inline">joinRoom</code>을 호출하지 않으면 방의
           참가자 수(<code class="inline">playerCount</code>)에 포함되지 않습니다.
           연결 쿼리의 <code class="inline">room</code> 하나로 브로드캐스트만 받도록 구성하세요.
+          <br><br>
+          <b>방 정원</b>: 컨트롤러는 방당 <b>최대 4명</b>. 5번째 컨트롤러가 <code class="inline">joinRoom</code>을 호출하면
+          서버가 그 클라이언트에게만 <code class="inline">roomFull</code> 이벤트(<code class="inline">{ room, maxPlayers: 4 }</code>)를 보내고 등록을 거부합니다.
+          Display는 <code class="inline">joinRoom</code>을 호출하지 않으므로 보통 영향 없음.
         </div>
       </section>
 
@@ -627,6 +631,28 @@ socket.on('game-finished', (d) =&gt; renderRanking(d.ranking));</code></pre>
           <pre><code>{ room: string, ranking: Array&lt;{ name, score, rank }&gt; }</code></pre>
         </div>
 
+        <div class="event" id="listen-statusUpdate">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>statusUpdate</code></div>
+          <p class="desc">방의 게임 상태가 바뀔 때마다 방 전체에 발행. payload는 단일 문자열.
+            컨트롤러의 <code class="inline">joinRoom</code> → <code class="inline">'pending'</code>(대기 화면),
+            <code class="inline">startGame</code> → <code class="inline">'play'</code>(게임 화면 전환),
+            <code class="inline">gameOver</code> → <code class="inline">'finish'</code>(결과 화면 전환).
+            Display의 화면 라우팅에 사용.</p>
+          <pre><code>'pending' | 'play' | 'finish'</code></pre>
+        </div>
+
+        <div class="event" id="listen-gameStarted">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>gameStarted</code></div>
+          <p class="desc">컨트롤러의 <code class="inline">startGame</code> 직후 방 전체에 발행 (payload 없음).
+            <code class="inline">statusUpdate</code>('play')와 함께 도착.</p>
+          <pre><code>// payload 없음</code></pre>
+        </div>
+
+        <div class="event" id="listen-status-queue">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>status-queue</code></div>
+          <p class="desc">대기열(큐)이 바뀔 때마다 모든 클라이언트에게 발행. 대기 순번 UI에 사용.</p>
+          <pre><code>string[]   // socketId 배열</code></pre>
+        </div>
       </section>
 
       <!-- ========== EMIT Events ========== -->
@@ -652,6 +678,32 @@ socket.emit('disconnect-room', { room: 'room-1' });</code></pre>
           </div>
         </div>
 
+        <div class="event" id="emit-reset-queue">
+          <div class="event-title"><span class="pill emit">EMIT</span><code>reset-queue</code></div>
+          <p class="desc">대기열 초기화. 서버는 <code class="inline">project</code> 룸으로
+            <code class="inline">reset-queue</code>를 브로드캐스트.</p>
+          <pre><code>// payload
+{ project: string }
+
+socket.emit('reset-queue', { project: 'dart' });</code></pre>
+          <div class="event-actions">
+            <label>project</label>
+            <input id="e-rq-project" value="dart" />
+            <div class="row" style="margin-top:8px">
+              <button class="emit" onclick="sendResetQueue()">emit reset-queue</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="event" id="emit-status-queue">
+          <div class="event-title"><span class="pill emit">EMIT</span><code>status-queue</code></div>
+          <p class="desc">현재 대기열 스냅샷을 요청. 응답은 <b>요청자에게만</b> 전달.</p>
+          <pre><code>socket.emit('status-queue');
+socket.on('status-queue', (queue) =&gt; renderQueue(queue));</code></pre>
+          <div class="event-actions">
+            <button class="emit" onclick="socketEmit('status-queue')">emit status-queue</button>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -680,7 +732,11 @@ socket.emit('disconnect-room', { room: 'room-1' });</code></pre>
 
       <section class="card">
         <h3>방 상태</h3>
-        <div class="row" style="justify-content:space-between">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <span class="k" style="color:var(--muted); font-size:12px">status</span>
+          <span class="pill listen" id="status-pill">—</span>
+        </div>
+        <div class="row" style="justify-content:space-between; margin-top:6px">
           <span class="k" style="color:var(--muted); font-size:12px">playerCount</span>
           <span class="count-big" id="pc">0</span>
         </div>
@@ -724,7 +780,12 @@ socket.emit('disconnect-room', { room: 'room-1' });</code></pre>
           <a href="#listen-dart-thrown">LISTEN · dart-thrown</a>
           <a href="#listen-game-result">LISTEN · game-result</a>
           <a href="#listen-game-finished">LISTEN · game-finished</a>
+          <a href="#listen-statusUpdate">LISTEN · statusUpdate</a>
+          <a href="#listen-gameStarted">LISTEN · gameStarted</a>
+          <a href="#listen-status-queue">LISTEN · status-queue</a>
           <a href="#emit-disconnect-room">EMIT · disconnect-room</a>
+          <a href="#emit-reset-queue">EMIT · reset-queue</a>
+          <a href="#emit-status-queue">EMIT · status-queue</a>
         </nav>
       </section>
     </aside>
@@ -742,11 +803,15 @@ socket.emit('disconnect-room', { room: 'room-1' });</code></pre>
     const LISTEN_EVENTS = [
       'joinedRoom',
       'roomPlayerCount',
+      'statusUpdate',
+      'gameStarted',
       'aim-update',
       'aim-off',
       'dart-thrown',
       'game-result',
       'game-finished',
+      'status-queue',
+      'reset-queue',
     ];
 
     // -------------- Board rendering --------------
@@ -879,6 +944,9 @@ socket.emit('disconnect-room', { room: 'room-1' });</code></pre>
         case 'roomPlayerCount':
           $('pc').textContent = data.playerCount ?? 0;
           break;
+        case 'statusUpdate':
+          $('status-pill').textContent = String(data ?? '—');
+          break;
         case 'aim-update': {
           aims.set(data.name, { x: data.aim.x, y: data.aim.y, t: Date.now() });
           $('last-aim').textContent = `${data.name} (${data.aim.x.toFixed(2)}, ${data.aim.y.toFixed(2)})`;
@@ -974,6 +1042,11 @@ socket.emit('disconnect-room', { room: 'room-1' });</code></pre>
       const room = $('e-dc-room').value.trim() || $('room').value.trim();
       if (!confirm(`정말로 방 "${room}" 의 모든 소켓을 끊을까요?`)) return;
       socketEmit('disconnect-room', { room });
+    }
+
+    function sendResetQueue() {
+      const project = $('e-rq-project').value.trim() || 'dart';
+      socketEmit('reset-queue', { project });
     }
 
     resize();

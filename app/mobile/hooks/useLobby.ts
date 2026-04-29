@@ -12,9 +12,6 @@ import { stripDisplayName } from "@/lib/displayName";
 
 const LOBBY_TIMEOUT_MS = 2 * 60 * 1000;
 const HOST_APPROVAL_TIMEOUT_MS = 30 * 1000;
-const GAME_STARTED_EVENT = "game-started";
-const START_GAME_EVENT = "start-game";
-
 interface UseLobbyProps {
   room: string;
   name: string;
@@ -80,11 +77,11 @@ export function useLobby({
   }, []);
 
   const leaveLobby = useCallback(() => {
-    if (joinedRoomRef.current) {
-      debugLog("[Lobby] leaveRoom emit");
-      socket.emit("leaveRoom", { room });
-      joinedRoomRef.current = false;
+    if (socket.connected) {
+      debugLog("[Lobby] socket disconnect");
+      socket.disconnect();
     }
+    joinedRoomRef.current = false;
     joinedLobbyRef.current = false;
     setIsInLobby(false);
     setLobbyPosition(null);
@@ -97,14 +94,11 @@ export function useLobby({
     lobbyStartAtRef.current = null;
     startRequestedRef.current = false;
     clearApprovalWait();
-  }, [clearApprovalWait, room]);
+  }, [clearApprovalWait]);
 
   const connectAndJoinLobby = useCallback(() => {
     if (socket.connected) {
       debugLog("[Lobby] 기존 소켓 연결 해제 후 재연결");
-      if (joinedRoomRef.current) {
-        socket.emit("leaveRoom", { room });
-      }
       socket.disconnect();
       joinedLobbyRef.current = false;
       joinedRoomRef.current = false;
@@ -149,24 +143,6 @@ export function useLobby({
       if (!slot) return;
 
       enterGame(slot, players);
-    };
-
-    const startGameWithPlayers = (players: string[]) => {
-      const position = socket.id ? players.indexOf(socket.id) : -1;
-      const slot = getSlotFromPosition(position);
-
-      if (!slot || position !== 0) {
-        startRequestedRef.current = false;
-        setCanStartGame(position === 0);
-        return;
-      }
-
-      debugLog(`[Lobby] host start-game: ${JSON.stringify(players)}`);
-      socket.emit(START_GAME_EVENT, { room, players });
-      socket.emit(GAME_STARTED_EVENT, { room, players });
-      setCanStartGame(false);
-      startRequestedRef.current = false;
-      onEnterGame(slot, players);
     };
 
     const joinRoomIfNeeded = () => {
@@ -256,28 +232,15 @@ export function useLobby({
           setHostApprovalTimeLeft(null);
         }
 
-        if (host && startRequestedRef.current) {
-          startGameWithPlayers(lobbySocketIds);
-        }
         return;
       }
 
       clearApprovalWait();
     };
 
-    const onGameStarted = (data: { players?: string[] }) => {
-      const players = Array.isArray(data.players)
-        ? Array.from(new Set(data.players)).slice(0, MAX_PLAYERS)
-        : [];
-      const position = socket.id ? players.indexOf(socket.id) : -1;
-      const slot = getSlotFromPosition(position);
-
-      if (!slot) {
-        clearApprovalWait();
-        return;
-      }
-
-      enterGame(slot, players);
+    const onGameStarted = () => {
+      startRequestedRef.current = false;
+      enterGameFromLobbySnapshot();
     };
 
     const onJoinedRoom = (data: {
@@ -289,20 +252,18 @@ export function useLobby({
       syncLobbyState(data.players);
     };
 
-    const onAimUpdate = (data: {
-      socketId?: string;
-      name?: string;
-      registration?: boolean;
-    }) => {
-      if (!data.registration || !data.socketId || data.socketId === socket.id) {
+    const onStatusUpdate = (status: "pending" | "play" | "finish") => {
+      debugLog(`[Lobby] statusUpdate: ${status}`);
+
+      if (status === "play") {
+        startRequestedRef.current = false;
+        enterGameFromLobbySnapshot();
         return;
       }
 
-      const players = lobbyPlayersRef.current.slice(0, MAX_PLAYERS);
-      if (!players.includes(data.socketId)) return;
-
-      debugLog(`[Lobby] registration start detected: ${data.socketId}`);
-      enterGameFromLobbySnapshot();
+      if (status === "finish") {
+        clearApprovalWait();
+      }
     };
 
     const onConnect = () => {
@@ -324,6 +285,10 @@ export function useLobby({
 
     const onError = (err: unknown) => {
       debugLog(`[Socket] error: ${String(err)}`);
+      startRequestedRef.current = false;
+      const players = lobbyPlayersRef.current.slice(0, MAX_PLAYERS);
+      const position = socket.id ? players.indexOf(socket.id) : -1;
+      setCanStartGame(position === 0);
     };
 
     const onRoomFull = (data: { room?: string; maxPlayers?: number }) => {
@@ -340,8 +305,8 @@ export function useLobby({
     socket.on("error", onError);
     socket.on("roomFull", onRoomFull);
     socket.on("joinedRoom", onJoinedRoom);
-    socket.on(GAME_STARTED_EVENT, onGameStarted);
-    socket.on("aim-update", onAimUpdate);
+    socket.on("gameStarted", onGameStarted);
+    socket.on("statusUpdate", onStatusUpdate);
 
     const timeoutId = window.setInterval(() => {
       if (!joinedLobbyRef.current || !lobbyStartAtRef.current) return;
@@ -363,8 +328,8 @@ export function useLobby({
       socket.off("error", onError);
       socket.off("roomFull", onRoomFull);
       socket.off("joinedRoom", onJoinedRoom);
-      socket.off(GAME_STARTED_EVENT, onGameStarted);
-      socket.off("aim-update", onAimUpdate);
+      socket.off("gameStarted", onGameStarted);
+      socket.off("statusUpdate", onStatusUpdate);
     };
   }, [
     clearApprovalWait,
@@ -429,11 +394,9 @@ export function useLobby({
     setCanStartGame(false);
     setHostApprovalTimeLeft(null);
     setHostApprovalDeadline(null);
-    debugLog(`[Lobby] host start-game: ${JSON.stringify(players)}`);
-    socket.emit(START_GAME_EVENT, { room, players });
-    socket.emit(GAME_STARTED_EVENT, { room, players });
-    onEnterGame(slot, players);
-  }, [isHost, onEnterGame, room]);
+    debugLog(`[Lobby] host startGame`);
+    socket.emit("startGame");
+  }, [isHost]);
 
   return {
     isInLobby,

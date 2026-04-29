@@ -171,7 +171,9 @@ export default function MobilePage() {
   usePageLeave({
     onLeave: () => {
       if (!joinedLobbyRef.current) return;
-      socket.emit("leaveRoom", { room });
+      if (socket.connected) {
+        socket.disconnect();
+      }
       joinedLobbyRef.current = false;
     },
   });
@@ -209,6 +211,7 @@ export default function MobilePage() {
     });
 
     finishGameEmittedRef.current = true;
+    socket.emit("gameOver", { winnerId: null, reason: null });
     socket.emit("finish-game", { room, scores });
   }, [gameFinished, gamePlayers, playerScores, room, socketId]);
 
