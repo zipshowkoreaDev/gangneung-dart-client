@@ -25,9 +25,7 @@ export function resolveDisplayPlayerKey(
   );
   if (slotKey) return slotKey;
 
-  const aliases = [data.socketId, data.playerId, data.name].filter(
-    Boolean
-  ) as string[];
+  const aliases = [data.socketId, data.playerId].filter(Boolean) as string[];
   for (const alias of aliases) {
     const mappedKey = options.aliasMap.get(alias);
     if (mappedKey) return mappedKey;
@@ -41,7 +39,7 @@ export function rememberPlayerAliases(
   key: string,
   data: PlayerIdentity
 ) {
-  [data.socketId, data.playerId, data.name]
+  [data.socketId, data.playerId]
     .filter(Boolean)
     .forEach((alias) => {
       aliasMap.set(alias as string, key);
@@ -63,8 +61,7 @@ export function getExistingPlayerEntry(
 
   return Array.from(playersMap.entries()).find(
     ([, player]) =>
-      (data.socketId && player.socketId === data.socketId) ||
-      (data.name && player.serverName === data.name)
+      data.socketId !== undefined && player.socketId === data.socketId
   );
 }
 

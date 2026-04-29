@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Dart Socket API – Display 문서</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg2: #070b1a;
+      --fg: #e8f0ff;
+      --muted: #8aa0c7;
+      --card: #111a33;
+      --card2: #0f1730;
+      --border: #22325a;
+      --accent: #4da3ff;
+      --accent2: #7aa8ff;
+      --ok: #2ecc71;
+      --warn: #f1c40f;
+      --danger: #ff4d5e;
+      --code: #0a1430;
+      --emit: #b46dff;
+      --listen: #2ecc71;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      height: 100%
+    }
+
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+      line-height: 1.55;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(12px);
+      background: rgba(11, 16, 32, 0.85);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+    }
+
+    header .inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+      font-weight: 600;
+    }
+
+    header .tag {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--listen);
+      color: #042412;
+      font-weight: 700;
+    }
+
+    header .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-right: 6px;
+    }
+
+    header .dot.on {
+      background: var(--ok);
+      box-shadow: 0 0 8px var(--ok);
+    }
+
+    header .dot.err {
+      background: var(--danger);
+    }
+
+    .conn-status {
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 420px;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      aside {
+        position: static !important;
+      }
+    }
+
+    aside {
+      position: sticky;
+      top: 72px;
+      align-self: start;
+      display: grid;
+      gap: 12px;
+      max-height: calc(100vh - 92px);
+      overflow-y: auto;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .card h2 {
+      margin: 0 0 6px 0;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card h3 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    input,
+    button,
+    select,
+    textarea {
+      font-size: 14px;
+      border-radius: 10px;
+      border: 1px solid #2a3a66;
+      background: var(--code);
+      color: var(--fg);
+      padding: 9px 12px;
+      font-family: inherit;
+      width: 100%;
+    }
+
+    textarea {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      resize: vertical;
+      min-height: 70px;
+    }
+
+    button {
+      cursor: pointer;
+      width: auto;
+      font-weight: 600;
+      transition: transform 0.05s, filter 0.1s;
+    }
+
+    button:hover {
+      filter: brightness(1.15);
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #001022;
+    }
+
+    button.emit {
+      background: var(--emit);
+      border-color: var(--emit);
+      color: #fff;
+    }
+
+    button.ghost {
+      background: transparent;
+    }
+
+    button.danger {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #fff;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12.5px;
+    }
+
+    pre {
+      background: var(--code);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      overflow-x: auto;
+      margin: 8px 0 0;
+      white-space: pre;
+    }
+
+    code.inline {
+      background: var(--code);
+      padding: 2px 7px;
+      border-radius: 6px;
+      color: var(--accent2);
+    }
+
+    .event {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .event:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .pill.emit {
+      background: rgba(180, 109, 255, 0.18);
+      color: #cfa7ff;
+      border: 1px solid rgba(180, 109, 255, 0.45);
+    }
+
+    .pill.listen {
+      background: rgba(46, 204, 113, 0.15);
+      color: #59d991;
+      border: 1px solid rgba(46, 204, 113, 0.45);
+    }
+
+    .event-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .event-title code {
+      background: var(--code);
+      padding: 3px 9px;
+      border-radius: 6px;
+      color: var(--accent2);
+      font-size: 14px;
+    }
+
+    .desc {
+      color: var(--muted);
+      font-size: 13.5px;
+      margin: 4px 0 10px;
+    }
+
+    .log {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      background: var(--code);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      height: 220px;
+      overflow-y: auto;
+      font-size: 11.5px;
+      line-height: 1.5;
+    }
+
+    .log-entry {
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      word-break: break-word;
+    }
+
+    .log-entry .time {
+      color: var(--muted);
+      margin-right: 6px;
+    }
+
+    .log-entry .dir-out {
+      color: #cfa7ff;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
+    .log-entry .dir-in {
+      color: #59d991;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
+    .log-entry .dir-sys {
+      color: var(--warn);
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
+    .log-entry .ev {
+      color: var(--fg);
+      font-weight: 600;
+    }
+
+    .log-entry .payload {
+      color: var(--muted);
+    }
+
+    .hint {
+      background: rgba(241, 196, 15, 0.08);
+      border-left: 3px solid var(--warn);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      color: #f0e3b9;
+      margin: 8px 0;
+    }
+
+    .toc {
+      font-size: 13px;
+    }
+
+    .toc a {
+      display: block;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 3px 0;
+      border-left: 2px solid transparent;
+      padding-left: 8px;
+      margin-left: -10px;
+    }
+
+    .toc a:hover {
+      color: var(--fg);
+      border-color: var(--accent);
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .live-badge .ping {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ok);
+      animation: ping 1.5s infinite;
+    }
+
+    @keyframes ping {
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    .event-actions {
+      margin-top: 10px;
+      padding: 10px;
+      background: var(--card2);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .event-actions label {
+      margin-bottom: 2px;
+    }
+
+    /* Dart visualization */
+    #board-wrap {
+      position: relative;
+      width: 100%;
+      padding-bottom: 100%;
+      background: var(--code);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    #board {
+      position: absolute;
+      inset: 0;
+    }
+
+    .last-events {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .last-events .row-ev {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 4px 8px;
+      background: var(--code);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .last-events .k {
+      color: var(--muted);
+    }
+
+    .players-list {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .player-chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(77, 163, 255, 0.15);
+      border: 1px solid rgba(77, 163, 255, 0.4);
+      font-size: 12px;
+      color: #b8d7ff;
+    }
+
+    .count-big {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .winner {
+      padding: 10px;
+      background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 100, 0, 0.1));
+      border: 1px solid rgba(255, 215, 0, 0.4);
+      border-radius: 10px;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="inner">
+      <span class="tag">DISPLAY</span>
+      <h1>Dart Socket API – Display 문서</h1>
+      <div class="conn-status" style="margin-left:auto">
+        <span class="dot" id="dot"></span>
+        <span id="status">연결 안 됨</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div>
+      <!-- ========== Overview ========== -->
+      <section class="card" id="overview">
+        <h2>개요</h2>
+        <p class="desc" style="margin-bottom:6px">
+          Display는 <b>게임 화면(관전자 뷰)</b>입니다. 주 역할은 <span class="pill listen">LISTEN</span> —
+          컨트롤러가 보낸 조준·다트·게임 결과 이벤트를 받아 화면에 렌더링합니다.
+          제어용으로 <span class="pill emit">EMIT</span> 몇 가지를 발행할 수 있습니다.
+        </p>
+
+        <h3 style="margin-top:14px">연결 정보</h3>
+        <pre><code>URL:       https://socket-relay.zipshowkorea.com/dart
+Transport: WebSocket / Polling (auto)
+Library:   socket.io-client@4.x
+Query:     ?room=&lt;방 이름&gt;   (필수 — 연결 시 해당 룸에 자동 참가)</code></pre>
+
+        <h3 style="margin-top:14px">기본 사용 예시</h3>
+        <pre><code>import io from 'socket.io-client';
+
+const socket = io('https://socket-relay.zipshowkorea.com/dart', {
+  query: { room: 'room-1' },
+});
+
+// 참가자 수/리스트 갱신
+socket.on('joinedRoom', (d) =&gt; renderPlayers(d.players));
+
+// 다트 조준 실시간 오버레이
+socket.on('aim-update', (d) =&gt; renderAim(d.name, d.aim));
+socket.on('aim-off',    (d) =&gt; clearAim(d.name));
+
+// 다트 꽂힘
+socket.on('dart-thrown', (d) =&gt; renderDart(d.name, d.aim, d.score));
+
+// 게임 종료 화면
+socket.on('game-finished', (d) =&gt; renderRanking(d.ranking));</code></pre>
+
+        <div class="hint">
+          Display는 <b>observer</b>로 동작할 수 있습니다.
+          Controller와 달리 <code class="inline">joinRoom</code>을 호출하지 않으면 방의
+          참가자 수(<code class="inline">playerCount</code>)에 포함되지 않습니다.
+          연결 쿼리의 <code class="inline">room</code> 하나로 브로드캐스트만 받도록 구성하세요.
+        </div>
+      </section>
+
+      <!-- ========== LISTEN Events ========== -->
+      <section class="card" style="margin-top:16px">
+        <h2><span class="pill listen">LISTEN</span> Server → Display</h2>
+        <p class="desc">Display의 핵심. 아래 이벤트가 들어오는 즉시 오른쪽 패널에 반영됩니다.</p>
+
+        <div class="event" id="listen-joinedRoom">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>joinedRoom</code></div>
+          <p class="desc">참가자가 들어오거나 나갈 때마다 방 전체에 발행. 참가자 리스트를 포함하므로
+            플레이어 네임태그 렌더링에 사용.</p>
+          <pre><code>{
+  room: string,
+  playerCount: number,
+  players: Array&lt;{ socketId: string, name: string }&gt;
+}</code></pre>
+        </div>
+
+        <div class="event" id="listen-roomPlayerCount">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>roomPlayerCount</code></div>
+          <p class="desc">인원 수만 가볍게 받을 때. <code class="inline">joinedRoom</code>과 함께 발행.</p>
+          <pre><code>{ room: string, playerCount: number }</code></pre>
+        </div>
+
+        <div class="event" id="listen-aim-update">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>aim-update</code></div>
+          <p class="desc">컨트롤러의 실시간 조준 좌표. 다트보드 위 조준선/커서 렌더링용.</p>
+          <pre><code>{ room: string, name: string, aim: { x: number, y: number } }</code></pre>
+        </div>
+
+        <div class="event" id="listen-aim-off">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>aim-off</code></div>
+          <p class="desc">조준 종료. 커서 숨기기·조준선 제거에 사용.</p>
+          <pre><code>{ room: string, name: string }</code></pre>
+        </div>
+
+        <div class="event" id="listen-dart-thrown">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>dart-thrown</code></div>
+          <p class="desc">다트가 꽂힌 순간. 보드에 다트를 그리고 점수를 표시.</p>
+          <pre><code>{
+  room: string,
+  name: string,
+  aim: { x: number, y: number },
+  score: number
+}</code></pre>
+        </div>
+
+        <div class="event" id="listen-game-result">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>game-result</code></div>
+          <p class="desc">게임 종료 결과 전체 패키지. 각 소켓별 개인 결과 + 전체 랭킹 포함.</p>
+          <pre><code>{
+  results: {
+    [socketId]: {
+      result: 'win' | 'lose' | 'tie',
+      score: number,
+      rank: number,
+      totalPlayers: number,
+      ranking: Array&lt;{ name, score, rank }&gt;
+    }
+  },
+  ranking: Array&lt;{ socketId, name, score, rank }&gt;
+}</code></pre>
+        </div>
+
+        <div class="event" id="listen-game-finished">
+          <div class="event-title"><span class="pill listen">LISTEN</span><code>game-finished</code></div>
+          <p class="desc">디스플레이 전용 랭킹 요약. 화면 중앙 우승 배너/랭킹 보드 렌더링에 사용.</p>
+          <pre><code>{ room: string, ranking: Array&lt;{ name, score, rank }&gt; }</code></pre>
+        </div>
+
+      </section>
+
+      <!-- ========== EMIT Events ========== -->
+      <section class="card" style="margin-top:16px">
+        <h2><span class="pill emit">EMIT</span> Display → Server</h2>
+        <p class="desc">Display가 세션을 제어하기 위해 보내는 이벤트. 실제 서버로 발행해볼 수 있습니다.</p>
+
+        <div class="event" id="emit-disconnect-room">
+          <div class="event-title"><span class="pill emit">EMIT</span><code>disconnect-room</code></div>
+          <p class="desc">해당 방의 <b>모든 소켓</b>(컨트롤러 + 디스플레이 + observer)을 강제 연결 해제.
+            게임 종료 후 <code class="inline">GAME_END_CLOSE_DELAY_MS</code>(5초) 대기 후 방 정리용으로 호출.</p>
+          <pre><code>// payload
+{ room: string }
+
+socket.emit('disconnect-room', { room: 'room-1' });</code></pre>
+          <div class="event-actions">
+            <label>room</label>
+            <input id="e-dc-room" placeholder="room-1" />
+            <div class="row" style="margin-top:8px">
+              <button class="danger" onclick="sendDisconnectRoom()">emit disconnect-room</button>
+              <span class="live-badge"><span class="ping"></span> 실서버 영향 있음 — 방의 모든 소켓이 끊깁니다</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <!-- ========== Live Playground ========== -->
+    <aside>
+      <section class="card">
+        <h2>📺 Live Playground</h2>
+        <label>Server URL</label>
+        <input id="url" value="https://socket-relay.zipshowkorea.com/dart" />
+        <div style="margin-top:8px">
+          <label>room</label>
+          <input id="room" value="room-1" />
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="primary" id="btn-connect" onclick="connect()">Connect</button>
+          <button class="danger ghost" id="btn-disconnect" onclick="disconnect()" disabled>Disconnect</button>
+        </div>
+        <div class="hint" style="margin-top:10px">
+          Connect 시 <code class="inline">room</code> 쿼리로 자동 입장 — Display는
+          observer로 동작하므로 <code class="inline">joinRoom</code>을 호출하지 않습니다.
+        </div>
+        <div style="font-size:12px; color:var(--muted); margin-top:6px">
+          socketId: <code class="inline" id="sid">-</code>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>방 상태</h3>
+        <div class="row" style="justify-content:space-between">
+          <span class="k" style="color:var(--muted); font-size:12px">playerCount</span>
+          <span class="count-big" id="pc">0</span>
+        </div>
+        <div class="players-list" id="players"></div>
+      </section>
+
+      <section class="card">
+        <h3>라이브 다트 보드</h3>
+        <div id="board-wrap">
+          <canvas id="board"></canvas>
+        </div>
+        <div class="last-events">
+          <div class="row-ev"><span class="k">aim-update</span><span id="last-aim">—</span></div>
+          <div class="row-ev"><span class="k">dart-thrown</span><span id="last-dart">—</span></div>
+        </div>
+      </section>
+
+      <section class="card" id="ranking-card" style="display:none">
+        <h3>🏆 게임 결과</h3>
+        <div id="winner"></div>
+        <div id="ranking"></div>
+      </section>
+
+      <section class="card">
+        <h3>이벤트 로그</h3>
+        <div class="log" id="log"></div>
+        <div class="row" style="margin-top:8px">
+          <button class="ghost" onclick="clearLog()">Clear</button>
+          <button class="ghost" onclick="clearBoard()">Board Clear</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>바로 가기</h3>
+        <nav class="toc">
+          <a href="#overview">개요</a>
+          <a href="#listen-joinedRoom">LISTEN · joinedRoom</a>
+          <a href="#listen-roomPlayerCount">LISTEN · roomPlayerCount</a>
+          <a href="#listen-aim-update">LISTEN · aim-update</a>
+          <a href="#listen-aim-off">LISTEN · aim-off</a>
+          <a href="#listen-dart-thrown">LISTEN · dart-thrown</a>
+          <a href="#listen-game-result">LISTEN · game-result</a>
+          <a href="#listen-game-finished">LISTEN · game-finished</a>
+          <a href="#emit-disconnect-room">EMIT · disconnect-room</a>
+        </nav>
+      </section>
+    </aside>
+  </main>
+
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"
+    integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
+    crossorigin="anonymous"></script>
+  <script>
+    let socket = null;
+
+    const $ = (id) => document.getElementById(id);
+    const logEl = $('log');
+
+    const LISTEN_EVENTS = [
+      'joinedRoom',
+      'roomPlayerCount',
+      'aim-update',
+      'aim-off',
+      'dart-thrown',
+      'game-result',
+      'game-finished',
+    ];
+
+    // -------------- Board rendering --------------
+    const canvas = $('board');
+    const ctx = canvas.getContext('2d');
+    const aims = new Map(); // name -> {x,y,t}
+    const darts = [];       // {x,y,score,name,t}
+
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      canvas.width = r.width * devicePixelRatio;
+      canvas.height = r.height * devicePixelRatio;
+      drawBoard();
+    }
+    new ResizeObserver(resize).observe(canvas);
+
+    function drawBoard() {
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // board rings
+      const cx = w / 2, cy = h / 2;
+      const R = Math.min(w, h) * 0.45;
+      const rings = [
+        { r: R, c: '#22325a' },
+        { r: R * 0.78, c: '#2a71ff22' },
+        { r: R * 0.55, c: '#2a71ff44' },
+        { r: R * 0.32, c: '#ff4d5e55' },
+        { r: R * 0.12, c: '#ffd70099' },
+      ];
+      rings.forEach(({ r, c }) => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = c;
+        ctx.fill();
+      });
+
+      // darts
+      darts.forEach(d => {
+        const px = d.x * w, py = d.y * h;
+        ctx.beginPath();
+        ctx.arc(px, py, 8 * devicePixelRatio, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = '#ff4d5e';
+        ctx.lineWidth = 3 * devicePixelRatio;
+        ctx.stroke();
+        ctx.fillStyle = '#e8f0ff';
+        ctx.font = `${12 * devicePixelRatio}px system-ui`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${d.name} · ${d.score}`, px, py - 14 * devicePixelRatio);
+      });
+
+      // aims
+      aims.forEach((a, name) => {
+        const px = a.x * w, py = a.y * h;
+        ctx.beginPath();
+        ctx.arc(px, py, 14 * devicePixelRatio, 0, Math.PI * 2);
+        ctx.strokeStyle = '#4da3ff';
+        ctx.lineWidth = 2 * devicePixelRatio;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(px - 18 * devicePixelRatio, py);
+        ctx.lineTo(px + 18 * devicePixelRatio, py);
+        ctx.moveTo(px, py - 18 * devicePixelRatio);
+        ctx.lineTo(px, py + 18 * devicePixelRatio);
+        ctx.stroke();
+        ctx.fillStyle = '#4da3ff';
+        ctx.font = `${11 * devicePixelRatio}px system-ui`;
+        ctx.fillText(name, px, py + 28 * devicePixelRatio);
+      });
+    }
+
+    function clearBoard() {
+      aims.clear();
+      darts.length = 0;
+      drawBoard();
+      $('last-aim').textContent = '—';
+      $('last-dart').textContent = '—';
+      $('ranking-card').style.display = 'none';
+    }
+
+    // -------------- Log / status --------------
+    function log(dir, ev, payload) {
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const dirCls = dir === 'IN' ? 'dir-in' : dir === 'OUT' ? 'dir-out' : 'dir-sys';
+      const arrow = dir === 'IN' ? '←' : dir === 'OUT' ? '→' : '·';
+      const t = new Date().toLocaleTimeString();
+      const payloadStr = payload === undefined
+        ? ''
+        : typeof payload === 'string'
+          ? payload
+          : JSON.stringify(payload);
+      entry.innerHTML =
+        `<span class="time">${t}</span>` +
+        `<span class="${dirCls}">${arrow}</span> ` +
+        `<span class="ev">${ev}</span> ` +
+        `<span class="payload">${escapeHtml(payloadStr)}</span>`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function clearLog() { logEl.innerHTML = ''; }
+
+    function setStatus(state) {
+      const dot = $('dot'), status = $('status');
+      dot.className = 'dot';
+      if (state === 'on') { dot.classList.add('on'); status.textContent = '연결됨'; }
+      else if (state === 'err') { dot.classList.add('err'); status.textContent = '오류'; }
+      else { status.textContent = '연결 안 됨'; }
+    }
+
+    // -------------- Event handlers --------------
+    function handle(ev, data) {
+      log('IN', ev, data);
+      switch (ev) {
+        case 'joinedRoom': {
+          $('pc').textContent = data.playerCount ?? 0;
+          const ps = data.players || [];
+          $('players').innerHTML = ps.map(p =>
+            `<span class="player-chip">${escapeHtml(p.name)}</span>`
+          ).join('');
+          break;
+        }
+        case 'roomPlayerCount':
+          $('pc').textContent = data.playerCount ?? 0;
+          break;
+        case 'aim-update': {
+          aims.set(data.name, { x: data.aim.x, y: data.aim.y, t: Date.now() });
+          $('last-aim').textContent = `${data.name} (${data.aim.x.toFixed(2)}, ${data.aim.y.toFixed(2)})`;
+          drawBoard();
+          break;
+        }
+        case 'aim-off':
+          aims.delete(data.name);
+          drawBoard();
+          break;
+        case 'dart-thrown':
+          darts.push({ x: data.aim.x, y: data.aim.y, score: data.score, name: data.name, t: Date.now() });
+          $('last-dart').textContent = `${data.name} · ${data.score}점 (${data.aim.x.toFixed(2)}, ${data.aim.y.toFixed(2)})`;
+          drawBoard();
+          break;
+        case 'game-finished':
+        case 'game-result': {
+          const ranking = data.ranking || [];
+          if (ranking.length === 0) break;
+          $('ranking-card').style.display = '';
+          const winner = ranking.find(r => r.rank === 1);
+          $('winner').innerHTML = winner
+            ? `<div class="winner">🥇 <b>${escapeHtml(winner.name)}</b> — ${winner.score}점</div>`
+            : '';
+          $('ranking').innerHTML = ranking.map(r =>
+            `<div class="row-ev"><span>${r.rank}위 · ${escapeHtml(r.name)}</span><span>${r.score}점</span></div>`
+          ).join('');
+          break;
+        }
+      }
+    }
+
+    // -------------- Connect / disconnect --------------
+    function connect() {
+      if (socket) socket.disconnect();
+      const url = $('url').value.trim();
+      const room = $('room').value.trim();
+      try {
+        socket = io(url, {
+          transports: ['websocket', 'polling'],
+          query: room ? { room } : {},
+          forceNew: true,
+        });
+      } catch (e) {
+        log('SYS', 'connect-error', e.message);
+        return;
+      }
+
+      socket.on('connect', () => {
+        setStatus('on');
+        $('btn-connect').disabled = true;
+        $('btn-disconnect').disabled = false;
+        $('sid').textContent = socket.id;
+        log('SYS', 'connect', { id: socket.id });
+      });
+
+      socket.on('disconnect', (reason) => {
+        setStatus('off');
+        $('btn-connect').disabled = false;
+        $('btn-disconnect').disabled = true;
+        $('sid').textContent = '-';
+        log('SYS', 'disconnect', reason);
+      });
+
+      socket.on('connect_error', (err) => {
+        setStatus('err');
+        log('SYS', 'connect_error', err.message);
+      });
+
+      LISTEN_EVENTS.forEach(ev => socket.on(ev, (d) => handle(ev, d)));
+    }
+
+    function disconnect() {
+      if (socket) socket.disconnect();
+    }
+
+    function needSocket() {
+      if (!socket || !socket.connected) {
+        log('SYS', 'warn', 'not connected — Connect 먼저');
+        return false;
+      }
+      return true;
+    }
+
+    function socketEmit(ev, payload) {
+      if (!needSocket()) return;
+      if (payload === undefined) socket.emit(ev);
+      else socket.emit(ev, payload);
+      log('OUT', ev, payload);
+    }
+
+    function sendDisconnectRoom() {
+      const room = $('e-dc-room').value.trim() || $('room').value.trim();
+      if (!confirm(`정말로 방 "${room}" 의 모든 소켓을 끊을까요?`)) return;
+      socketEmit('disconnect-room', { room });
+    }
+
+    resize();
+  </script>
+</body>
+
+</html>

@@ -43,7 +43,6 @@ export default function MobilePage() {
   const [startError, setStartError] = useState("");
   const [gamePlayers, setGamePlayers] = useState<string[]>([]);
   const finishGameEmittedRef = useRef(false);
-  const gameCleanupRef = useRef(false);
 
   const handleEnterGame = useCallback(
     (slot: PlayerSlot, players: string[]) => {
@@ -94,7 +93,6 @@ export default function MobilePage() {
   const resetRoundState = useCallback(() => {
     resetSessionRoundState();
     finishGameEmittedRef.current = false;
-    gameCleanupRef.current = false;
   }, [resetSessionRoundState]);
 
   const handleRoomFull = useCallback(
@@ -117,7 +115,6 @@ export default function MobilePage() {
     emitAimUpdate,
     emitAimOff,
     emitThrowDart,
-    cleanupGameSocket,
     leaveGame,
     socketId,
   } = useMobileSocket({
@@ -214,14 +211,6 @@ export default function MobilePage() {
     finishGameEmittedRef.current = true;
     socket.emit("finish-game", { room, scores });
   }, [gameFinished, gamePlayers, playerScores, room, socketId]);
-
-  useEffect(() => {
-    if (!gameFinished || gameCleanupRef.current) return;
-
-    gameCleanupRef.current = true;
-    cleanupGameSocket("game finished");
-    leaveLobby();
-  }, [cleanupGameSocket, gameFinished, leaveLobby]);
 
   useEffect(() => {
     if (endCountdown === null || endCountdown > 0) return;

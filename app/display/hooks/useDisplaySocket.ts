@@ -114,6 +114,17 @@ export function useDisplaySocket({
       onLog?.(`Observing room: ${room}`);
     };
 
+    const onDisconnect = (reason: string) => {
+      onLog?.(`Socket disconnected: ${reason}`);
+
+      if (reason === "io server disconnect") {
+        waitingPlayerIdsRef.current = [];
+        resetSessionRefs();
+        clearDisplayState();
+        socket.connect();
+      }
+    };
+
     const resetAggregationForNewGame = () => {
       const hasRegisteredPlayers = Array.from(playersRef.current.values()).some(
         (player) => player.slot
@@ -640,6 +651,7 @@ export function useDisplaySocket({
     };
 
     socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
     socket.on("clientInfo", onClientInfo);
     socket.on("joinedRoom", onJoinedRoom);
     socket.on("roomPlayerCount", onRoomPlayerCount);
@@ -652,6 +664,7 @@ export function useDisplaySocket({
 
     return () => {
       socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
       socket.off("clientInfo", onClientInfo);
       socket.off("joinedRoom", onJoinedRoom);
       socket.off("roomPlayerCount", onRoomPlayerCount);

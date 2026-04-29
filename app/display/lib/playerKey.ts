@@ -5,7 +5,7 @@ export function resolvePlayerKey(data: {
   name?: string;
   socketId?: string;
 }) {
-  return data.socketId || data.playerId || data.name || "player";
+  return data.socketId || data.playerId || "player";
 }
 
 export function getSlotPlayerKey(slot?: PlayerSlot) {

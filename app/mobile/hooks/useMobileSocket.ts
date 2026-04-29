@@ -156,7 +156,7 @@ export function useMobileSocket({
         return;
       }
 
-      const playerId = data.socketId || data.playerId || data.name;
+      const playerId = data.socketId || data.playerId;
       if (!playerId) return;
       debugLog(`[Socket] player finished: ${playerId}`);
       onPlayerFinishedRef.current?.(playerId);
@@ -167,7 +167,7 @@ export function useMobileSocket({
       name?: string;
       score?: number;
     }) => {
-      const playerId = data.socketId || data.playerId || data.name;
+      const playerId = data.socketId || data.playerId;
       if (!playerId || typeof data.score !== "number") return;
       onPlayerScoredRef.current?.({
         socketId: playerId,
@@ -280,16 +280,6 @@ export function useMobileSocket({
     socket.emit("leaveRoom", { room: currentRoomRef.current });
   }, []);
 
-  const cleanupGameSocket = useCallback((reason: string) => {
-    if (!socket.connected) return;
-
-    debugLog(`[Socket] cleanup game socket (${reason})`);
-    gameEndedRef.current = true;
-    if (currentRoomRef.current) {
-      socket.emit("leaveRoom", { room: currentRoomRef.current });
-    }
-  }, []);
-
   // unmount 시 정리
   useEffect(() => {
     return () => {
@@ -299,26 +289,6 @@ export function useMobileSocket({
       turnSyncStateRef.current = INITIAL_TURN_SYNC_STATE;
     };
   }, [leaveJoinedRooms]);
-
-  useEffect(() => {
-    if (!room || !enabled || !slot) return;
-
-    const intervalId = window.setInterval(() => {
-      if (gameEndedRef.current) return;
-      if (!socket.connected || !slotRef.current) return;
-
-      socket.emit("aim-update", {
-        room,
-        socketId: socket.id,
-        name,
-        slot: slotRef.current,
-        aim: lastAimRef.current,
-        turnSyncState: turnSyncStateRef.current,
-      });
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [enabled, name, room, slot]);
 
   const emitAimUpdate = useCallback(
     (
@@ -409,7 +379,6 @@ export function useMobileSocket({
     emitAimUpdate,
     emitThrowDart,
     emitAimOff,
-    cleanupGameSocket,
     leaveGame,
     socketId: currentSocketId,
   };
