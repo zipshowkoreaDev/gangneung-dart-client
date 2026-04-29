@@ -66,6 +66,7 @@ export function useLobby({
   const lastJoinedSocketIdRef = useRef<string | null>(null);
   const startRequestedRef = useRef(false);
   const lobbyPlayersRef = useRef<string[]>([]);
+  const lobbyOrderRef = useRef<string[]>([]);
   const joinedRoomRef = useRef(false);
 
   const clearApprovalWait = useCallback(() => {
@@ -88,6 +89,7 @@ export function useLobby({
     setLobbyPlayers(null);
     setLobbyPlayerNames(new Map());
     lobbyPlayersRef.current = [];
+    lobbyOrderRef.current = [];
     setIsHost(false);
     setCanStartGame(false);
     setHostApprovalTimeLeft(null);
@@ -156,13 +158,25 @@ export function useLobby({
     const syncLobbyState = (
       players: Array<{ socketId: string; name: string }> | undefined,
     ) => {
-      const lobbySocketIds = Array.from(
+      const incomingSocketIds = Array.from(
         new Set(
           (players ?? [])
             .map((player) => player.socketId)
             .filter((socketId): socketId is string => Boolean(socketId)),
         ),
-      ).slice(0, MAX_PLAYERS);
+      );
+      const incomingSocketIdSet = new Set(incomingSocketIds);
+      const preservedOrder = lobbyOrderRef.current.filter((socketId) =>
+        incomingSocketIdSet.has(socketId),
+      );
+      const appendedOrder = incomingSocketIds.filter(
+        (socketId) => !preservedOrder.includes(socketId),
+      );
+      const lobbySocketIds = [...preservedOrder, ...appendedOrder].slice(
+        0,
+        MAX_PLAYERS,
+      );
+      lobbyOrderRef.current = lobbySocketIds;
 
       debugLog(`[Lobby] players: ${JSON.stringify(lobbySocketIds)}`);
       setLobbyPlayers(lobbySocketIds);
@@ -249,6 +263,10 @@ export function useLobby({
       players?: Array<{ socketId: string; name: string }>;
     }) => {
       if (data.room && data.room !== room) return;
+      if (!Array.isArray(data.players)) {
+        debugLog("[Lobby] joinedRoom without players snapshot - ignored");
+        return;
+      }
       syncLobbyState(data.players);
     };
 
@@ -347,7 +365,37 @@ export function useLobby({
       !isInLobby ||
       isInGame ||
       !isHost ||
-      !joinedLobbyRef.current ||
+      !isWaitingForApproval ||
+      startRequestedRef.current ||
+      hostApprovalDeadline !== null
+    ) {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      const deadline = Date.now() + HOST_APPROVAL_TIMEOUT_MS;
+      debugLog("[Lobby] host approval deadline initialized");
+      setHostApprovalDeadline(deadline);
+      setHostApprovalTimeLeft(
+        Math.max(0, Math.ceil((deadline - Date.now()) / 1000)),
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timerId);
+  }, [
+    hostApprovalDeadline,
+    isHost,
+    isInGame,
+    isInLobby,
+    isWaitingForApproval,
+  ]);
+
+  useEffect(() => {
+    if (
+      !isInLobby ||
+      isInGame ||
+      !isHost ||
+      !isWaitingForApproval ||
       hostApprovalDeadline === null
     ) {
       return;
@@ -369,7 +417,14 @@ export function useLobby({
     updateTimeLeft();
     const timerId = window.setInterval(updateTimeLeft, 250);
     return () => window.clearInterval(timerId);
-  }, [hostApprovalDeadline, isHost, isInGame, isInLobby, leaveLobby]);
+  }, [
+    hostApprovalDeadline,
+    isHost,
+    isInGame,
+    isInLobby,
+    isWaitingForApproval,
+    leaveLobby,
+  ]);
 
   const waitingPlayers =
     lobbyPlayers?.slice(0, MAX_PLAYERS).map((socketId, index) => ({

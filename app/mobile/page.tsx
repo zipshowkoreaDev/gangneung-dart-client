@@ -376,7 +376,12 @@ export default function MobilePage() {
       {sessionValid === true &&
         isInLobby &&
         !isInGame &&
-        lobbyPosition === null && <StatusScreen />}
+        !isWaitingForApproval && (
+          <StatusScreen
+            title="참가 상태 동기화 중"
+            message="참가자 목록을 불러오는 중입니다."
+          />
+        )}
     </div>
   );
 }

@@ -64,6 +64,7 @@ export function useDisplaySocket({
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
   const playerAliasKeyRef = useRef<Map<string, string>>(new Map());
   const waitingPlayerIdsRef = useRef<string[]>([]);
+  const waitingPlayerOrderRef = useRef<string[]>([]);
   const recentThrowFingerprintsRef = useRef<Map<string, number>>(new Map());
   // React state 비동기 반영 경쟁 조건 방지: 마지막 점수를 ref로 동기 추적
   const playerLastScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
@@ -127,6 +128,7 @@ export function useDisplaySocket({
 
       if (reason === "io server disconnect") {
         waitingPlayerIdsRef.current = [];
+        waitingPlayerOrderRef.current = [];
         resetSessionRefs();
         clearDisplayState();
         socket.connect();
@@ -169,10 +171,18 @@ export function useDisplaySocket({
       const joinedSocketIds = getPlayerSocketIds(data.players);
       const removedPlayerKeys: string[] = [];
       if (joinedSocketIds.length > 0) {
-        waitingPlayerIdsRef.current = Array.from(new Set(joinedSocketIds)).slice(
+        const currentSocketIds = new Set(joinedSocketIds);
+        const preservedOrder = waitingPlayerOrderRef.current.filter((socketId) =>
+          currentSocketIds.has(socketId),
+        );
+        const appendedOrder = joinedSocketIds.filter(
+          (socketId) => !preservedOrder.includes(socketId),
+        );
+        waitingPlayerIdsRef.current = [...preservedOrder, ...appendedOrder].slice(
           0,
           MAX_PLAYERS,
         );
+        waitingPlayerOrderRef.current = waitingPlayerIdsRef.current;
       }
 
       setPlayers((prev) => {
