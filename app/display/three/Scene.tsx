@@ -598,7 +598,7 @@ function DartEventHandler({
       const boardPosition = aimToBoardPosition(data.aim, camera);
       if (!boardPosition) return;
 
-      const ownerKey = data.socketId || data.playerId || "player";
+      const ownerKey = data.playerId || data.socketId || "player";
       onDartThrow(boardPosition, ownerKey);
     };
 
