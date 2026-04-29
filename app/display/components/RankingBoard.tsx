@@ -1,6 +1,7 @@
 "use client";
 
 import { RANKING_LIMIT, RankingEntry } from "@/lib/ranking";
+import { formatDuplicateDisplayNames } from "@/lib/displayName";
 
 interface RankingBoardProps {
   rankings: RankingEntry[];
@@ -43,6 +44,11 @@ export default function RankingBoard({ rankings }: RankingBoardProps) {
     { length: RANKING_LIMIT },
     (_, index) => rankings[index]
   );
+  const filledEntries = slots.filter((entry): entry is RankingEntry => Boolean(entry));
+  const displayNames = formatDuplicateDisplayNames(filledEntries, (entry) => entry.name);
+  const displayNameByEntry = new Map(
+    filledEntries.map((entry, index) => [entry, displayNames[index]] as const),
+  );
 
   return (
     <div
@@ -58,6 +64,7 @@ export default function RankingBoard({ rankings }: RankingBoardProps) {
       </div>
       {slots.map((entry, index) => {
         const style = RANK_STYLES[index];
+        const displayName = entry ? displayNameByEntry.get(entry) ?? "" : "";
 
         return (
           <div
@@ -71,7 +78,7 @@ export default function RankingBoard({ rankings }: RankingBoardProps) {
             <span
               className={`flex min-h-[3.45cqw] flex-1 items-center truncate text-[2.25cqw] font-semibold leading-none ${style.nameClass}`}
             >
-              {entry?.name ?? ""}
+              {displayName}
             </span>
             <span
               className={`text-right text-[2.5cqw] font-black leading-none ${style.scoreClass}`}

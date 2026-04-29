@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { PlayerScore } from "@/app/display/types/player";
 import { getPlayerColor } from "@/app/display/lib/playerColors";
 import { MAX_PLAYERS, type PlayerSlot } from "@/lib/room";
+import { formatDuplicateDisplayNames } from "@/lib/displayName";
 
 type ScoreboardProps = {
   players: Map<string, PlayerScore>;
@@ -68,7 +69,13 @@ function getCompactNameStyle(level: OverflowLevel) {
   };
 }
 
-function PlayerNameRow({ player }: { player: PlayerScore }) {
+function PlayerNameRow({
+  player,
+  displayName,
+}: {
+  player: PlayerScore;
+  displayName: string;
+}) {
   const nameRef = useRef<HTMLSpanElement | null>(null);
   const [overflowLevel, setOverflowLevel] = useState<OverflowLevel>("default");
 
@@ -102,7 +109,7 @@ function PlayerNameRow({ player }: { player: PlayerScore }) {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [player.name]);
+  }, [displayName]);
 
   const color = player.slot ? getPlayerColor(player.slot - 1) : "#ffffff";
   const remainingThrows = Math.max(0, THROW_DOT_COUNT - player.totalThrows);
@@ -119,7 +126,7 @@ function PlayerNameRow({ player }: { player: PlayerScore }) {
         className="min-w-0 flex-1 truncate text-left font-bold leading-none"
         style={nameStyle}
       >
-        {player.name}
+        {displayName}
       </span>
       <div
         className="flex shrink-0 items-center justify-end"
@@ -155,6 +162,10 @@ export default function Scoreboard({ players }: ScoreboardProps) {
   const sortedPlayers = Array.from(players.values()).sort(
     (a, b) =>
       (a.slot ?? Number.MAX_SAFE_INTEGER) - (b.slot ?? Number.MAX_SAFE_INTEGER),
+  );
+  const displayNames = formatDuplicateDisplayNames(sortedPlayers, (player) => player.name);
+  const displayNameByPlayer = new Map(
+    sortedPlayers.map((player, index) => [player, displayNames[index]] as const),
   );
   const hasGameStarted = sortedPlayers.some(
     (player) => !player.isWaiting && (player.isReady || player.totalThrows > 0),
@@ -210,7 +221,7 @@ export default function Scoreboard({ players }: ScoreboardProps) {
     );
   };
 
-  const renderPlayerCard = (player: PlayerScore) => {
+  const renderPlayerCard = (player: PlayerScore, displayName: string) => {
     const throwScores = player.throwScores ?? [];
 
     return (
@@ -225,7 +236,7 @@ export default function Scoreboard({ players }: ScoreboardProps) {
           opacity: 1,
         }}
       >
-        <PlayerNameRow player={player} />
+        <PlayerNameRow player={player} displayName={displayName} />
 
         <div className="flex min-h-[clamp(1.2rem,2.8cqh,1.8rem)] items-center justify-between gap-[clamp(0.35rem,1.2cqh,0.8rem)] font-bold leading-none text-[#FFD700]">
           <div className="flex min-w-0 items-center gap-[clamp(0.25rem,0.8cqh,0.5rem)] text-left text-[clamp(0.75rem,2.1cqh,1.2rem)]">
@@ -249,13 +260,16 @@ export default function Scoreboard({ players }: ScoreboardProps) {
         {Array.from({ length: MAX_PLAYERS }, (_, index) => {
           const slot = (index + 1) as PlayerSlot;
           const player = playersBySlot.get(slot);
+          const displayName = player ? displayNameByPlayer.get(player) : undefined;
 
           return (
             <div
               key={`slot-${slot}`}
               className="rounded-[clamp(0.75rem,2cqw,1rem)] bg-white/40"
             >
-              {player ? renderPlayerCard(player) : renderEmptyCard(slot)}
+              {player && displayName
+                ? renderPlayerCard(player, displayName)
+                : renderEmptyCard(slot)}
             </div>
           );
         })}

@@ -12,7 +12,6 @@ import useNameInputFlow from "./hooks/useNameInputFlow";
 import useGameLifecycle from "./hooks/useGameLifecycle";
 import useMobileGameSession from "./hooks/useMobileGameSession";
 import useRadiusParam from "./hooks/useRadiusParam";
-import useQueueSessionFlow from "./hooks/useQueueSessionFlow";
 import useStartExitFlow from "./hooks/useStartExitFlow";
 import useWakeLock from "./hooks/useWakeLock";
 import SessionValidating from "./components/SessionValidating";
@@ -20,8 +19,10 @@ import AccessDenied from "./components/AccessDenied";
 import NameInput from "./components/NameInput";
 import GameScreen from "./components/GameScreen";
 import ResultScreen from "./components/ResultScreen";
-import WaitingScreen from "./components/WaitingScreen";
-import QueueLoading from "./components/QueueLoading";
+import StatusScreen from "./components/StatusScreen";
+import { formatDuplicateDisplayNames } from "@/lib/displayName";
+import { useLobby } from "./hooks/useLobby";
+import { debugLog } from "./lib/debugLog";
 
 export default function MobilePage() {
   const [sessionValid] = useState<boolean | null>(() =>
@@ -41,33 +42,37 @@ export default function MobilePage() {
   const [assignedSlot, setAssignedSlot] = useState<PlayerSlot | null>(null);
   const [startError, setStartError] = useState("");
   const [gamePlayers, setGamePlayers] = useState<string[]>([]);
-  const [canJoinCurrentGame, setCanJoinCurrentGame] = useState<boolean | null>(
-    null,
-  );
   const finishGameEmittedRef = useRef(false);
   const gameCleanupRef = useRef(false);
 
+  const handleEnterGame = useCallback(
+    (slot: PlayerSlot, players: string[]) => {
+      debugLog(`✅ 게임 입장, 슬롯: ${slot}`);
+      setAssignedSlot(slot);
+      setHasJoined(true);
+      setIsInGame(true);
+      setGamePlayers(players);
+    },
+    [setAssignedSlot, setGamePlayers, setHasJoined, setIsInGame],
+  );
+
   const {
-    isInQueue,
-    queuePosition,
-    queueSnapshot,
+    isInLobby,
+    lobbyPosition,
     waitingPlayers,
     isWaitingForApproval: hasApprovalWait,
     isHost,
     canStartGame,
     hostApprovalTimeLeft,
-    joinedQueueRef,
-    connectAndJoinQueue,
-    leaveQueue,
+    joinedLobbyRef,
+    connectAndJoinLobby,
+    leaveLobby,
     startGame,
-  } = useQueueSessionFlow({
+  } = useLobby({
     room,
     name: socketName,
     isInGame,
-    setAssignedSlot,
-    setHasJoined,
-    setIsInGame,
-    setGamePlayers,
+    onEnterGame: handleEnterGame,
   });
 
   const {
@@ -108,16 +113,6 @@ export default function MobilePage() {
     [resetRoundState],
   );
 
-  const handleRoomPlayersUpdated = useCallback(
-    (data: {
-      playerCount: number;
-      players?: Array<{ socketId: string; name: string }>;
-    }) => {
-      setCanJoinCurrentGame(data.playerCount < MAX_PLAYERS);
-    },
-    [],
-  );
-
   const {
     emitAimUpdate,
     emitAimOff,
@@ -135,7 +130,6 @@ export default function MobilePage() {
     onPlayerScored: handlePlayerScored,
     onGameResult: setGameResult,
     onRoomFull: handleRoomFull,
-    onRoomPlayersUpdated: handleRoomPlayersUpdated,
     onGameFinished: handleSocketGameFinished,
   });
 
@@ -166,9 +160,9 @@ export default function MobilePage() {
     errorMessage,
     setStartError,
     requestMotionPermission,
-    connectAndJoinQueue,
+    connectAndJoinLobby,
     resetName,
-    leaveQueue,
+    leaveLobby,
     leaveGame,
     stopSensors,
     setHasFinishedTurn,
@@ -177,7 +171,13 @@ export default function MobilePage() {
     startSensors,
   });
 
-  usePageLeave({ joinedQueueRef });
+  usePageLeave({
+    onLeave: () => {
+      if (!joinedLobbyRef.current) return;
+      socket.emit("leaveRoom", { room });
+      joinedLobbyRef.current = false;
+    },
+  });
   useWakeLock({ enabled: isInGame && !gameFinished });
 
   useEffect(() => {
@@ -193,50 +193,6 @@ export default function MobilePage() {
     hasFinishedTurn,
     socketId,
   ]);
-
-  useEffect(() => {
-    if (sessionValid !== true || isInQueue || isInGame) return;
-
-    const updateJoinAvailability = (queue: string[]) => {
-      const uniqueQueue = Array.from(new Set(queue));
-      setCanJoinCurrentGame(uniqueQueue.length < MAX_PLAYERS);
-    };
-
-    const handleGameStarted = () => {
-      setCanJoinCurrentGame(false);
-      setGameResult(null);
-    };
-
-    const handleGameEnded = () => {
-      setCanJoinCurrentGame(true);
-      socket.emit("status-queue");
-    };
-
-    if (!socket.connected) {
-      socket.io.opts.query = { room, name: "_mobile_status" };
-      socket.connect();
-    }
-
-    socket.on("status-queue", updateJoinAvailability);
-    socket.on("game-started", handleGameStarted);
-    socket.on("game-finished", handleGameEnded);
-    socket.on("reset-queue", handleGameEnded);
-    socket.emit("status-queue");
-
-    const timerId = window.setInterval(() => {
-      if (socket.connected) {
-        socket.emit("status-queue");
-      }
-    }, 3000);
-
-    return () => {
-      window.clearInterval(timerId);
-      socket.off("status-queue", updateJoinAvailability);
-      socket.off("game-started", handleGameStarted);
-      socket.off("game-finished", handleGameEnded);
-      socket.off("reset-queue", handleGameEnded);
-    };
-  }, [isInGame, isInQueue, room, sessionValid, setGameResult]);
 
   useGameLifecycle({
     stopSensors,
@@ -264,8 +220,8 @@ export default function MobilePage() {
 
     gameCleanupRef.current = true;
     cleanupGameSocket("game finished");
-    leaveQueue();
-  }, [cleanupGameSocket, gameFinished, leaveQueue]);
+    leaveLobby();
+  }, [cleanupGameSocket, gameFinished, leaveLobby]);
 
   useEffect(() => {
     if (endCountdown === null || endCountdown > 0) return;
@@ -304,33 +260,16 @@ export default function MobilePage() {
     [setCustomName, startError],
   );
 
-  const isWaitingInQueue =
-    isInQueue &&
-    !isInGame &&
-    queuePosition !== null &&
-    queuePosition >= MAX_PLAYERS;
   const isWaitingForApproval =
-    isInQueue &&
+    isInLobby &&
     !isInGame &&
-    queuePosition !== null &&
-    queuePosition >= 0 &&
-    queuePosition < MAX_PLAYERS &&
+    lobbyPosition !== null &&
+    lobbyPosition >= 0 &&
+    lobbyPosition < MAX_PLAYERS &&
     hasApprovalWait;
-  const shouldBlockNewEntry =
-    sessionValid === true &&
-    !isInQueue &&
-    !hasFinishedTurn &&
-    !isInGame &&
-    canJoinCurrentGame === false;
-  const isCheckingJoinAvailability =
-    sessionValid === true &&
-    !isInQueue &&
-    !hasFinishedTurn &&
-    !isInGame &&
-    canJoinCurrentGame === null;
-
   const renderWaitingPlayers = () => {
     if (waitingPlayers.length === 0) return null;
+    const displayNames = formatDuplicateDisplayNames(waitingPlayers, (player) => player.name);
 
     return (
       <div className="mt-6 w-[min(82vw,320px)] rounded-xl border border-black/10 bg-white/65 p-4 text-left shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-md">
@@ -358,7 +297,7 @@ export default function MobilePage() {
                   {player.slot ?? index + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-800">
-                  {player.name}
+                  {displayNames[index]}
                 </span>
                 {isMe && (
                   <span className="shrink-0 rounded-md bg-[#FFD700] px-2 py-1 text-[11px] font-bold text-black">
@@ -378,19 +317,8 @@ export default function MobilePage() {
       {sessionValid === null && <SessionValidating />}
       {sessionValid === false && <AccessDenied />}
 
-      {sessionValid === true && isWaitingInQueue && (
-        <WaitingScreen
-          aheadCount={
-            queuePosition !== null
-              ? Math.max(0, queuePosition - MAX_PLAYERS)
-              : null
-          }
-          queue={queueSnapshot}
-        />
-      )}
-
       {sessionValid === true && isWaitingForApproval && (
-        <QueueLoading
+        <StatusScreen
           title={isHost ? "참가자 대기 중" : "게임 시작 대기 중"}
           message={
             isHost
@@ -402,11 +330,11 @@ export default function MobilePage() {
           actionDisabled={!canStartGame}
         >
           {renderWaitingPlayers()}
-        </QueueLoading>
+        </StatusScreen>
       )}
 
       {sessionValid === true && hasFinishedTurn && !gameFinished && (
-        <QueueLoading
+        <StatusScreen
           title="다른 플레이어 진행 중"
           message="모든 플레이어가 끝날 때까지 기다려주세요."
         />
@@ -435,31 +363,16 @@ export default function MobilePage() {
       )}
 
       {sessionValid === true && !hasFinishedTurn && isInGame && !myTurn && (
-        <QueueLoading
+        <StatusScreen
           title="차례 대기 중"
           message="앞 플레이어의 투구가 끝나면 자동으로 시작됩니다."
         />
       )}
 
-      {shouldBlockNewEntry && (
-        <QueueLoading
-          title="현재 참여할 수 없습니다"
-          message="이번 게임이 끝나면 다시 참여할 수 있습니다."
-        />
-      )}
-
-      {isCheckingJoinAvailability && (
-        <QueueLoading
-          title="참여 상태 확인 중"
-          message="현재 게임 참가 가능 여부를 확인하고 있습니다."
-        />
-      )}
-
       {sessionValid === true &&
-        !isInQueue &&
+        !isInLobby &&
         !hasFinishedTurn &&
-        !isInGame &&
-        canJoinCurrentGame === true && (
+        !isInGame && (
           <NameInput
             name={customName}
             onNameChange={handleNameChange}
@@ -469,9 +382,9 @@ export default function MobilePage() {
         )}
 
       {sessionValid === true &&
-        isInQueue &&
+        isInLobby &&
         !isInGame &&
-        queuePosition === null && <QueueLoading />}
+        lobbyPosition === null && <StatusScreen />}
     </div>
   );
 }

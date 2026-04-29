@@ -7,10 +7,10 @@
 
 ## 목적
 
-- 플레이어는 모바일에서 QR 인증 후 대기열에 참가합니다.
-- 상위 4명이 한 게임 세션을 구성합니다.
+- 플레이어는 모바일에서 QR 인증 후 room에 참가합니다.
+- 최대 4명이 한 게임 세션을 구성합니다.
 - 각 플레이어는 자신의 턴에 자이로 센서로 조준하고 다트를 던집니다.
-- 디스플레이는 대기열, 조준점, 투척 결과, 점수, 종료 결과를 실시간으로 표시합니다.
+- 디스플레이는 로비 참가자, 조준점, 투척 결과, 점수, 종료 결과를 실시간으로 표시합니다.
 
 ---
 
@@ -24,12 +24,10 @@ app/
   display/         현장 디스플레이
 ```
 
-각 앱의 역할은 분리되어 있습니다.
-
-- `admin`: 현장 운영자가 접속 QR을 생성하고 대기열 초기화를 요청합니다.
+- `admin`: 현장 운영자가 접속 QR을 생성하고 방 종료를 요청합니다.
 - `auth`: QR 토큰 형식을 검증하고 세션을 `sessionStorage`에 저장합니다.
-- `mobile`: 이름 입력, 대기열 참여, 게임 참여, 자이로 조준/투척을 담당합니다.
-- `display`: observer로 연결되어 대기열과 게임 상태를 시각화합니다.
+- `mobile`: 이름 입력, room 참가, 게임 참여, 자이로 조준/투척을 담당합니다.
+- `display`: observer로 연결되어 로비와 게임 상태를 시각화합니다.
 
 ---
 
@@ -76,7 +74,7 @@ npm run dev
 
 1. `admin/qr`에서 QR URL을 생성합니다.
 2. URL에는 `/auth/{token}?room={room}` 형식의 세션 진입 주소가 들어갑니다.
-3. 필요 시 `reset-queue`로 전체 대기열 초기화를 요청합니다.
+3. 필요 시 `disconnect-room`으로 현재 room 세션을 종료합니다.
 
 ### 2. 인증
 
@@ -85,19 +83,18 @@ npm run dev
 3. 유효하면 세션을 저장하고 `/mobile?room={room}`으로 이동합니다.
 4. 유효하지 않으면 인증 실패 화면을 보여줍니다.
 
-### 3. 모바일 대기열
+### 3. 모바일 로비
 
 1. 플레이어가 이름을 입력합니다.
 2. 모션 권한을 요청합니다.
-3. 소켓 연결 후 `join-queue`를 전송합니다.
-4. 모바일은 `status-queue`를 주기적으로 받아 자신의 위치를 추적합니다.
-5. 대기열 상위 4명은 이번 게임 참가 후보가 됩니다.
+3. 소켓 연결 후 `joinRoom`으로 room 참가를 시도합니다.
+4. room이 가득 찼으면 `roomFull`을 받아 진입을 막습니다.
+5. `joinedRoom` 기준 상위 4명이 이번 게임 참가 후보가 됩니다.
 6. 1번 플레이어는 host가 되며 30초 안에 게임 시작을 승인할 수 있습니다.
-7. 4명이 모두 모이면 같은 상위 4명으로 게임 세션이 구성됩니다.
 
 ### 4. 게임 시작
 
-1. host가 `start-game`을 요청하거나 상위 4명 기준으로 게임 시작 조건이 충족됩니다.
+1. host가 `start-game`을 요청합니다.
 2. 서버/클라이언트는 `game-started`를 기준으로 같은 참가자 집합을 확정합니다.
 3. 각 모바일은 자신의 `slot`과 참가자 목록을 받아 게임 상태로 전환합니다.
 4. 디스플레이는 기존 게임 상태를 비우고 새 세션 UI로 초기화합니다.
@@ -115,14 +112,13 @@ npm run dev
 1. 모든 플레이어가 종료되면 host가 `finish-game`을 전송합니다.
 2. 서버는 `game-result`, `game-finished`를 브로드캐스트합니다.
 3. 모바일은 결과 화면과 종료 카운트다운을 보여줍니다.
-4. 디스플레이는 우승 오버레이와 랭킹 반영을 수행합니다.
-5. 디스플레이는 연결을 끊지 않고 다음 `game-started`를 기다립니다.
+4. 디스플레이는 우승 오버레이와 랭킹을 표시합니다.
+5. 결과 표시가 끝나면 디스플레이가 `disconnect-room`을 호출해 room 전체를 비웁니다.
+6. 다음 참가자는 새 연결로 다시 `joinRoom` 합니다.
 
 ---
 
 ## 소켓 설계 원칙
-
-이 프로젝트의 핵심 원칙은 아래 4가지입니다.
 
 ### 1. 소켓은 싱글톤
 
@@ -130,40 +126,38 @@ npm run dev
 - `autoConnect: false`로 두고 각 앱이 필요한 시점에 직접 연결합니다.
 - 연결 시 `query.room`, `query.name`을 함께 설정합니다.
 
-### 2. 큐와 게임을 분리
+### 2. room 자체를 로비로 사용
 
-- `status-queue`, `join-queue`, `leave-queue`는 로비/대기열 단계입니다.
-- `aim-update`, `throw-dart`, `aim-off`, `finish-game`은 게임 단계입니다.
-- display는 observer로서 두 단계를 모두 구독하지만, 제어권은 mobile/admin 쪽에 있습니다.
+- 큐 이벤트(`join-queue`, `leave-queue`, `status-queue`)에는 의존하지 않습니다.
+- 모바일은 `joinRoom`으로 참가를 시도하고, 서버는 `roomFull`로 정원 초과를 알립니다.
+- 로비 참가자 목록은 `joinedRoom`, `roomPlayerCount`를 기준으로 동기화합니다.
 
 ### 3. display는 observer
 
 - display는 room 상태를 관찰하고 렌더링합니다.
-- 게임 종료 후 room 관찰을 끊지 않습니다.
-- 다음 게임이 시작되면 `game-started`를 기준으로 내부 상태만 초기화합니다.
+- 게임 종료 후 결과 화면을 보여준 뒤 `disconnect-room`으로 room 세션 정리를 트리거합니다.
+- 다음 게임은 새로 입장한 참가자들로 다시 시작합니다.
 
-### 4. 클라이언트는 복구 가능해야 함
+### 4. 세션은 종료 시 완전히 비움
 
-- 재연결 시 `status-queue` 재요청
-- 필요 시 `leave-queue -> join-queue` 재진입
-- host stale 상황에서는 `reset-queue` 기반 복구
-- 페이지 이탈/언마운트 시 `leave-queue`, `leaveRoom` 정리
+- 게임 종료 후 현재 room의 연결을 모두 끊어 다음 세션과 섞이지 않게 합니다.
+- 페이지 이탈/언마운트 시 `leaveRoom` 중심으로 정리합니다.
+- 모바일은 `roomFull`과 `disconnect` 이후 초기 상태로 되돌아갈 수 있어야 합니다.
 
 ---
 
 ## 소켓 이벤트
 
-### 큐/로비 이벤트
+### 로비/room 이벤트
 
 | 이벤트 | 송신 주체 | 목적 |
 |------|------|------|
-| `join-queue` | mobile | 대기열 참가 |
-| `leave-queue` | mobile | 대기열 이탈 |
-| `status-queue` | mobile, display | 현재 대기열 스냅샷 요청/수신 |
+| `joinRoom` | mobile | room 참가 시도 |
+| `leaveRoom` | mobile | room 이탈 |
 | `joinedRoom` | server | 현재 room 참가자 목록 전달 |
 | `roomPlayerCount` | server | room 인원 수 전달 |
 | `roomFull` | server | 정원 초과 안내 |
-| `reset-queue` | admin, recovery flow | 대기열/진행 상태 초기화 |
+| `disconnect-room` | display, admin | room 전체 세션 종료 |
 
 ### 게임 진행 이벤트
 
@@ -181,15 +175,15 @@ npm run dev
 ### 이벤트별 실제 사용 방식
 
 - `aim-update`
-  - 대기열 단계에서는 `registration`, `queueRegistration` 플래그로 참가자 존재를 알려주는 용도로도 사용됩니다.
-  - 게임 단계에서는 실제 조준 좌표를 보냅니다.
+  - 게임 시작 등록과 실시간 조준 좌표 전송에 사용됩니다.
 - `aim-off`
   - `totalThrows >= 3`일 때 해당 플레이어 턴 종료로 취급합니다.
 - `game-result`
   - 모바일은 본인 결과 화면에 사용합니다.
-  - display는 최종 종료 UI의 핵심 기준보다 보조 결과 이벤트에 가깝습니다.
 - `game-finished`
   - display와 mobile 모두 세션 종료 기준으로 사용합니다.
+- `disconnect-room`
+  - 결과 화면 종료 후 현재 room의 모든 연결을 정리합니다.
 
 ---
 
@@ -203,8 +197,8 @@ npm run dev
 
 운영 규칙:
 
-1. 대기열 상위 4명이 이번 게임 참가자입니다.
-2. queue position `0..3`이 slot `1..4`가 됩니다.
+1. `joinedRoom` 참가자 목록의 앞 4명이 이번 게임 참가자입니다.
+2. room 내 위치 `0..3`이 slot `1..4`가 됩니다.
 3. 게임 중 색상, 점수판, 조준점은 slot 기준으로 맞춥니다.
 4. display는 `slot`, `socketId`, alias를 함께 관리하지만 최종 시각 표현은 slot 기준입니다.
 
@@ -217,14 +211,14 @@ npm run dev
 - `auth`에서 세션이 저장되어야 진입 가능
 - 이름 입력
 - 모션 권한 요청
-- `connectAndJoinQueue()`
+- `joinRoom` 시도
 
-### 대기열
+### 로비
 
-- `status-queue` heartbeat
+- `joinedRoom`, `roomPlayerCount`로 참가자 표시
 - host 승인 대기
-- stale host 감지 시 자동 복구
-- 대기열 타임아웃 시 자동 이탈
+- 로비 타임아웃 시 자동 이탈
+- `roomFull` 수신 시 진입 실패 처리
 
 ### 게임
 
@@ -239,7 +233,8 @@ npm run dev
 
 - `game-result`
 - `game-finished`
-- 종료 카운트다운 후 `leaveQueue`, `leaveRoom`, 센서 정리
+- 종료 카운트다운 후 `leaveRoom`, 센서 정리
+- 이후 room 전체 종료는 `disconnect-room`에 맡김
 
 ---
 
@@ -248,8 +243,7 @@ npm run dev
 ### 연결
 
 - room observer로 연결
-- `status-queue`를 주기적으로 요청
-- `joinedRoom`, `roomPlayerCount`, `status-queue`로 대기열 표시
+- `joinedRoom`, `roomPlayerCount`로 로비 상태 표시
 
 ### 게임 시작
 
@@ -268,8 +262,7 @@ npm run dev
 
 - `game-finished` 수신 시 결과 오버레이 표시
 - 랭킹 저장/갱신
-- 소켓 연결은 유지
-- 다음 `game-started`를 기다림
+- 결과 카운트다운 종료 후 `disconnect-room`
 
 ---
 
@@ -293,12 +286,11 @@ npm run dev
 
 ## 안정화 / 예외 처리
 
-- 페이지 이탈 시 `leave-queue` 최대 전송
-- 재연결 시 큐 재정합 시도
+- 페이지 이탈 시 `leaveRoom` 정리
 - room full 시 모바일 진입 차단
-- host가 응답하지 않으면 stale host 복구 수행
-- display는 다음 게임을 위해 연결 유지
+- display는 결과 화면 종료 후 room 전체 연결 정리
 - 모바일은 게임 종료 후 cleanup을 명시적으로 수행
+- 다음 게임 참가자는 항상 새 세션으로 다시 입장
 
 ---
 
@@ -311,8 +303,6 @@ npm run dev
 
 ## 현재 구조 판단
 
-지금 구조는 아래 원칙으로 유지하는 것이 맞습니다.
-
 - `app`: 제품 라우트와 UI
 - `lib`: 공용 도메인 로직
 - `shared`: 공용 인프라
@@ -323,4 +313,3 @@ npm run dev
 
 - `app/mobile/page.tsx`
 - `app/display/hooks/useDisplaySocket.ts`
-

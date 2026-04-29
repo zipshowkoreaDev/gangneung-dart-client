@@ -3,17 +3,20 @@ import type { Dispatch, SetStateAction } from "react";
 import type { FinishedPlayer } from "@/app/display/types/events";
 import type { PlayerScore } from "@/app/display/types/player";
 import { DISPLAY_EVENTS } from "@/lib/displayEvents";
+import { socket } from "@/shared/socket";
 
 const GAME_END_COUNTDOWN_SECONDS = 5;
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
 
 type UseDisplayGameSessionProps = {
+  room: string;
   setAimPositions: Dispatch<SetStateAction<AimState>>;
   setPlayers: Dispatch<SetStateAction<Map<string, PlayerScore>>>;
 };
 
 export default function useDisplayGameSession({
+  room,
   setAimPositions,
   setPlayers,
 }: UseDisplayGameSessionProps) {
@@ -79,6 +82,9 @@ export default function useDisplayGameSession({
       const cleanupSession = gameSessionRef.current;
       const timer = window.setTimeout(() => {
         if (gameSessionRef.current !== cleanupSession) return;
+        if (socket.connected) {
+          socket.emit("disconnect-room", { room });
+        }
         setHasMatchStarted(false);
         setWinners([]);
         setEndCountdown(null);
@@ -96,7 +102,7 @@ export default function useDisplayGameSession({
       1000
     );
     return () => window.clearTimeout(timer);
-  }, [endCountdown, setAimPositions, setPlayers]);
+  }, [endCountdown, room, setAimPositions, setPlayers]);
 
   return {
     hasMatchStarted,

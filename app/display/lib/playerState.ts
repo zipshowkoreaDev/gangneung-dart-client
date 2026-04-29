@@ -1,7 +1,6 @@
-import { stripDisplayName } from "@/lib/displayName";
 import type { PlayerScore } from "@/app/display/types/player";
 import {
-  getQueuePlayerKey,
+  getWaitingPlayerKey,
   getSlotPlayerKey,
   resolvePlayerKey,
 } from "@/app/display/lib/playerKey";
@@ -18,11 +17,11 @@ export function resolveDisplayPlayerKey(
   data: PlayerIdentity,
   options: {
     aliasMap: Map<string, string>;
-    getQueuedSocketSlot: (socketId?: string) => PlayerSlot | undefined;
+    getWaitingSocketSlot: (socketId?: string) => PlayerSlot | undefined;
   }
 ) {
   const slotKey = getSlotPlayerKey(
-    data.slot ?? options.getQueuedSocketSlot(data.socketId)
+    data.slot ?? options.getWaitingSocketSlot(data.socketId)
   );
   if (slotKey) return slotKey;
 
@@ -54,9 +53,8 @@ export function getExistingPlayerEntry(
   key: string,
   data: { name?: string; socketId?: string }
 ): [string, PlayerScore] | undefined {
-  const displayName = data.name ? stripDisplayName(data.name) : undefined;
-  const queueKey = data.socketId ? getQueuePlayerKey(data.socketId) : undefined;
-  const candidates = [key, queueKey].filter(Boolean) as string[];
+  const waitingKey = data.socketId ? getWaitingPlayerKey(data.socketId) : undefined;
+  const candidates = [key, waitingKey].filter(Boolean) as string[];
 
   for (const candidate of candidates) {
     const player = playersMap.get(candidate);
@@ -66,8 +64,7 @@ export function getExistingPlayerEntry(
   return Array.from(playersMap.entries()).find(
     ([, player]) =>
       (data.socketId && player.socketId === data.socketId) ||
-      (data.name && player.serverName === data.name) ||
-      (displayName && player.name === displayName)
+      (data.name && player.serverName === data.name)
   );
 }
 
@@ -78,9 +75,9 @@ export function removeDuplicateWaitingPlayers(
 ) {
   if (!socketId) return;
 
-  const queueKey = getQueuePlayerKey(socketId);
-  if (queueKey !== keepKey) {
-    playersMap.delete(queueKey);
+  const waitingKey = getWaitingPlayerKey(socketId);
+  if (waitingKey !== keepKey) {
+    playersMap.delete(waitingKey);
   }
 
   Array.from(playersMap.entries()).forEach(([entryKey, player]) => {

@@ -194,7 +194,6 @@ export function useMobileSocket({
     const handleGameFinished = (data: { room?: string }) => {
       if (data.room && data.room !== room) return;
       gameEndedRef.current = true;
-      socket.emit("leave-queue");
       if (currentRoomRef.current) {
         socket.emit("leaveRoom", { room: currentRoomRef.current });
       }
@@ -286,7 +285,6 @@ export function useMobileSocket({
 
     debugLog(`[Socket] cleanup game socket (${reason})`);
     gameEndedRef.current = true;
-    socket.emit("leave-queue");
     if (currentRoomRef.current) {
       socket.emit("leaveRoom", { room: currentRoomRef.current });
     }
@@ -296,7 +294,6 @@ export function useMobileSocket({
   useEffect(() => {
     return () => {
       leaveJoinedRooms("unmount");
-      socket.emit("leave-queue");
       hasJoinedRef.current = false;
       currentRoomRef.current = "";
       turnSyncStateRef.current = INITIAL_TURN_SYNC_STATE;
@@ -390,7 +387,6 @@ export function useMobileSocket({
 
   const leaveGame = useCallback(() => {
     if (socket.connected) {
-      socket.emit("leave-queue");
       leaveJoinedRooms("game exit");
       if (currentRoomRef.current) {
         socket.emit("aim-off", {

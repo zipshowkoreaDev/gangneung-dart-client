@@ -305,26 +305,7 @@
       <button class="btn-secondary" id="checkRoom">방 인원 확인</button>
       <button class="btn-danger" id="disconnectAll">모두 연결 해제</button>
       <button class="btn-primary" id="finishGame" style="background: #ff9800; border-color: #ff9800;">게임 완료</button>
-    </div>
-
-    <div class="card" style="background: #e8f5e9; border: 2px solid #4CAF50; margin-top: 20px;">
-      <h2 style="margin-top: 0; color: #2e7d32;">🎮 큐 관리 시스템 (Queue Management)</h2>
-      <div style="margin-bottom: 15px;">
-        <button class="btn-secondary" id="statusQueue">큐 상태 확인</button>
-        <button class="btn-primary" id="joinQueue">큐 참가</button>
-        <button class="btn-danger" id="leaveQueue">큐 나가기</button>
-        <button class="btn-danger" id="resetQueue" style="background: #ff5722;">🔄 큐 초기화</button>
-      </div>
-      <div style="background: #fff3cd; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 14px;">
-        ℹ️ <strong>현재 활성 클라이언트:</strong> <span id="activeClient">없음</span>
-      </div>
-      <div class="queue-status" style="background: white; padding: 15px; border-radius: 8px; margin-top: 15px;">
-        <h3 style="margin-top: 0; font-size: 16px; color: #555;">
-          현재 큐 상태
-          <span id="queueCount" style="color: #4CAF50; font-weight: bold;">(0명)</span>
-        </h3>
-        <div id="queueList" style="margin-top: 10px;"></div>
-      </div>
+      <button class="btn-danger" id="disconnectRoom" style="background: #9c27b0;">방 종료</button>
     </div>
 
     <div class="client-info">
@@ -403,19 +384,9 @@
     let playerName2 = '';
     let playerScore1 = 0;
     let playerScore2 = 0;
-    let activeClientNum = 0; // 0: 없음, 1: 클라이언트1, 2: 클라이언트2
 
     // 방 정보
     let playerCount = 0;
-
-    // 큐 관리용 변수
-    let queueSockets = []; // [{ socket, name, socketId }] 형태
-    let queueSocketCounter = 1; // 자동 생성되는 큐 플레이어 번호
-    let selectedQueueSocketId = null; // 현재 선택된 큐 소켓 ID
-
-    // 각 소켓의 큐 순서 저장 (socketId -> position)
-    let socketQueuePositions = new Map(); // Map<socketId, { position, total }>
-    let currentQueueList = []; // 현재 큐 전체 리스트
 
     // ============================================
     // DOM 요소 참조 (DOM References)
@@ -433,10 +404,7 @@
     const checkRoomBtn = document.getElementById('checkRoom');
     const disconnectAllBtn = document.getElementById('disconnectAll');
     const finishGameBtn = document.getElementById('finishGame');
-    const statusQueueBtn = document.getElementById('statusQueue');
-    const joinQueueBtn = document.getElementById('joinQueue');
-    const leaveQueueBtn = document.getElementById('leaveQueue');
-    const resetQueueBtn = document.getElementById('resetQueue');
+    const disconnectRoomBtn = document.getElementById('disconnectRoom');
 
     // 표시 요소
     const status1 = document.getElementById('status1');
@@ -452,14 +420,11 @@
     const roomDisplay = document.getElementById('roomDisplay');
     const playerCountDisplay = document.getElementById('playerCount');
     const gameReady = document.getElementById('gameReady');
-    const activeClient = document.getElementById('activeClient');
     const logDiv = document.getElementById('log');
 
-    // 순위 및 큐 관련
+    // 순위 관련
     const rankingSection = document.getElementById('rankingSection');
     const rankingList = document.getElementById('rankingList');
-    const queueList = document.getElementById('queueList');
-    const queueCount = document.getElementById('queueCount');
 
     // ============================================
     // 유틸리티 함수 (Utility Functions)
@@ -484,7 +449,6 @@
     function getAnyConnectedSocket() {
       if (socket1 && socket1.connected) return socket1;
       if (socket2 && socket2.connected) return socket2;
-      if (queueSockets.length > 0) return queueSockets[0].socket;
       return null;
     }
 
@@ -506,164 +470,12 @@
           type: 'client2'
         };
       }
-      const queueSocket = queueSockets.find(q => q.socketId === socketId);
-      if (queueSocket) {
-        return {
-          socket: queueSocket.socket,
-          name: queueSocket.name,
-          type: 'queue'
-        };
-      }
       return null;
     }
 
     // ============================================
     // UI 업데이트 함수 (UI Update Functions)
     // ============================================
-
-    /**
-     * 큐 상태 데이터 업데이트 (각 소켓의 순서 계산 및 저장)
-     */
-    function updateQueueData(queueArray) {
-      currentQueueList = queueArray;
-      socketQueuePositions.clear();
-
-      queueArray.forEach((socketId, index) => {
-        socketQueuePositions.set(socketId, {
-          position: index + 1, // 1-based index
-          total: queueArray.length,
-          isFirst: index === 0,
-          isLast: index === queueArray.length - 1
-        });
-      });
-    }
-
-    /**
-     * 특정 소켓의 큐 순서 가져오기
-     */
-    function getMyQueuePosition(socketId) {
-      return socketQueuePositions.get(socketId);
-    }
-
-    /**
-     * 큐 리스트 표시 업데이트
-     */
-    function updateQueueDisplay(queueArray) {
-      // 큐 데이터 업데이트
-      updateQueueData(queueArray);
-
-      queueCount.textContent = `(${queueArray.length}명)`;
-
-      if (queueArray.length === 0) {
-        queueList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">큐가 비어있습니다</div>';
-        selectedQueueSocketId = null;
-        return;
-      }
-
-      queueList.innerHTML = '';
-      queueArray.forEach((socketId, index) => {
-        const queuePos = socketQueuePositions.get(socketId);
-        const position = queuePos.position;
-        const socketInfo = findSocketById(socketId);
-        const clientName = socketInfo ? socketInfo.name : 'Unknown';
-        const isMyClient = socketInfo !== null;
-        const isSelected = selectedQueueSocketId === socketId;
-
-        const item = document.createElement('div');
-        item.style.cssText = `
-          padding: 12px 15px;
-          margin: 8px 0;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          background: ${isSelected ? '#fff3cd' : isMyClient ? '#e8f5e9' : '#f5f5f5'};
-          border: 2px solid ${isSelected ? '#ff9800' : isMyClient ? '#4CAF50' : '#ddd'};
-          font-weight: ${isMyClient ? 'bold' : 'normal'};
-          cursor: pointer;
-          transition: all 0.2s ease;
-        `;
-
-        // 클릭 이벤트 추가
-        item.onclick = () => {
-          selectedQueueSocketId = socketId;
-          log(`🔍 큐에서 소켓 선택: ${clientName} (${socketId})`);
-          updateQueueDisplay(queueArray); // 선택 상태 업데이트를 위해 재렌더링
-        };
-
-        item.onmouseover = () => {
-          if (!isSelected) {
-            item.style.transform = 'translateY(-2px)';
-            item.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
-          }
-        };
-
-        item.onmouseout = () => {
-          item.style.transform = 'translateY(0)';
-          item.style.boxShadow = 'none';
-        };
-
-        const positionBadge = document.createElement('div');
-        positionBadge.style.cssText = `
-          background: ${position === 1 ? '#ffd700' : position === 2 ? '#c0c0c0' : '#cd7f32'};
-          color: ${position <= 3 ? '#fff' : '#333'};
-          padding: 4px 12px;
-          border-radius: 20px;
-          font-weight: bold;
-          min-width: 40px;
-          text-align: center;
-          margin-right: 15px;
-        `;
-        positionBadge.textContent = `${position}위`;
-
-        const info = document.createElement('div');
-        info.style.cssText = 'flex: 1;';
-
-        // 순서 정보 가져오기
-        const queueInfo = getMyQueuePosition(socketId);
-        let statusText = '';
-        if (queueInfo) {
-          if (queueInfo.isFirst) {
-            statusText = '<span style="color: #ff9800; font-weight: bold;"> 👑 다음 차례</span>';
-          } else {
-            statusText = `<span style="color: #666;"> (대기: ${queueInfo.position - 1}명 앞)</span>`;
-          }
-        }
-
-        info.innerHTML = `
-          <div style="font-size: 14px;">
-            ${clientName} ${isMyClient ? '(나)' : ''} ${isSelected ? '✓' : ''}${statusText}
-          </div>
-          <div style="font-size: 11px; color: #666; font-family: monospace;">${socketId}</div>
-        `;
-
-        item.appendChild(positionBadge);
-        item.appendChild(info);
-        queueList.appendChild(item);
-      });
-    }
-
-    /**
-     * 현재 활성화된 클라이언트 표시 업데이트
-     */
-    function updateActiveClient() {
-      if (socket1 && socket1.connected) {
-        activeClientNum = 1;
-        activeClient.textContent = `클라이언트 1 (${playerName1})`;
-        activeClient.style.color = '#2e7d32';
-        activeClient.style.fontWeight = 'bold';
-      } else if (socket2 && socket2.connected) {
-        activeClientNum = 2;
-        activeClient.textContent = `클라이언트 2 (${playerName2})`;
-        activeClient.style.color = '#2e7d32';
-        activeClient.style.fontWeight = 'bold';
-      } else {
-        activeClientNum = 0;
-        activeClient.textContent = '없음';
-        activeClient.style.color = '#999';
-        activeClient.style.fontWeight = 'normal';
-      }
-    }
 
     /**
      * 클라이언트 연결 상태 UI 업데이트
@@ -695,8 +507,6 @@
           currentScore2.textContent = '0';
         }
       }
-
-      updateActiveClient();
     }
 
     /**
@@ -1010,40 +820,8 @@
         log(`❌ 클라이언트 ${clientNum} 에러: ${JSON.stringify(error)}`);
       });
 
-      // === 큐 관련 이벤트 ===
-      socket.on('status-queue', (queue) => {
-        const queueArray = queue || [];
-        log(`📋 큐 상태 업데이트: ${queueArray.length}명 대기 중`);
-
-        // 큐 디스플레이 업데이트 (전역 변수에 순서 저장)
-        updateQueueDisplay(queueArray);
-
-        // 현재 클라이언트의 순서 정보 가져오기
-        const myQueueInfo = getMyQueuePosition(socket.id);
-        if (myQueueInfo) {
-          const playerName = clientNum === 1 ? playerName1 : playerName2;
-          log(`   ⭐ 클라이언트 ${clientNum} (${playerName}): ${myQueueInfo.position}번째 / 총 ${myQueueInfo.total}명`);
-
-          if (myQueueInfo.isFirst) {
-            log(`   🥇 ${playerName}님이 맨 앞 순서입니다!`);
-          }
-        } else {
-          log(`   ℹ️ 클라이언트 ${clientNum}은 현재 큐에 없습니다.`);
-        }
-      });
-
-      socket.on('joined-queue', (data) => {
-        log(`✅ 큐 참가 완료`);
-      });
-
-      socket.on('left-queue', (data) => {
-        log(`✅ 큐 나가기 완료`);
-      });
-
-      socket.on('reset-queue', (data) => {
-        log(`🔄 큐가 초기화되었습니다!`);
-        updateQueueDisplay([]);
-        selectedQueueSocketId = null;
+      socket.on('roomFull', (data) => {
+        log(`🚫 방이 가득 찼습니다. room=${data.room}, maxPlayers=${data.maxPlayers}`);
       });
     }
 
@@ -1062,101 +840,6 @@
     }
 
     // ============================================
-    // 큐 관리 함수 (Queue Management)
-    // ============================================
-
-    /**
-     * 새로운 큐 소켓 생성 및 큐 참가
-     */
-    function createQueueSocket() {
-      const serverUrl = serverUrlInput.value.trim() || 'https://socket-relay.zipshowkorea.com';
-      const room = roomInput.value.trim() || 'TEST';
-      const playerName = `Queue Player ${queueSocketCounter}`;
-
-      log(`➕ 새로운 소켓 생성 및 큐 참가: ${playerName}`);
-
-      const newSocket = io(`${serverUrl}/dart`, {
-        query: {
-          room: room.toUpperCase(),
-          name: playerName
-        },
-        reconnection: false,
-        transports: ['websocket', 'polling']
-      });
-
-      newSocket.on('connect', () => {
-        log(`✅ 큐 소켓 연결 성공! Socket ID: ${newSocket.id}, Name: ${playerName}`);
-
-        queueSockets.push({
-          socket: newSocket,
-          name: playerName,
-          socketId: newSocket.id
-        });
-
-        queueSocketCounter++;
-        newSocket.emit('join-queue');
-        log(`📝 ${playerName} 큐 참가 요청 전송`);
-      });
-
-      newSocket.on('status-queue', (queue) => {
-        const queueArray = queue || [];
-        log(`📋 큐 상태 업데이트: ${queueArray.length}명 대기 중`);
-
-        // 큐 디스플레이 업데이트 (전역 변수에 순서 저장)
-        updateQueueDisplay(queueArray);
-
-        // 현재 큐 소켓의 순서 정보 가져오기
-        const myQueueInfo = getMyQueuePosition(newSocket.id);
-        if (myQueueInfo) {
-          log(`   ⭐ ${playerName}: ${myQueueInfo.position}번째 / 총 ${myQueueInfo.total}명`);
-
-          if (myQueueInfo.isFirst) {
-            log(`   🥇 ${playerName}님이 맨 앞 순서입니다!`);
-          }
-        }
-      });
-
-      newSocket.on('connect_error', (error) => {
-        log(`❌ 큐 소켓 연결 실패 (${playerName}): ${error.message}`);
-      });
-
-      newSocket.on('disconnect', () => {
-        log(`⚠️ 큐 소켓 연결 해제 (${playerName})`);
-        queueSockets = queueSockets.filter(q => q.socketId !== newSocket.id);
-        if (selectedQueueSocketId === newSocket.id) {
-          selectedQueueSocketId = null;
-        }
-      });
-
-      newSocket.on('reset-queue', (data) => {
-        log(`🔄 큐가 초기화되었습니다! (${playerName})`);
-        updateQueueDisplay([]);
-        selectedQueueSocketId = null;
-      });
-    }
-
-    /**
-     * 선택된 소켓을 큐에서 제거
-     */
-    function leaveQueueWithSelectedSocket() {
-      if (!selectedQueueSocketId) {
-        log('❌ 큐에서 제거할 소켓을 선택하세요. (큐 리스트에서 항목 클릭)');
-        return;
-      }
-
-      const socketInfo = findSocketById(selectedQueueSocketId);
-      if (!socketInfo || !socketInfo.socket.connected) {
-        log(`❌ 선택된 소켓이 연결되어 있지 않습니다.`);
-        selectedQueueSocketId = null;
-        return;
-      }
-
-      log(`➖ ${socketInfo.name} (${selectedQueueSocketId}) 큐 나가기 요청`);
-      socketInfo.socket.emit('leave-queue');
-      selectedQueueSocketId = null;
-    }
-
-    // ============================================
     // 이벤트 리스너 (Event Listeners)
     // ============================================
 
@@ -1167,16 +850,12 @@
     // 클라이언트 박스 클릭 - 활성 클라이언트 전환
     client1Box.onclick = () => {
       if (socket1 && socket1.connected) {
-        activeClientNum = 1;
-        updateActiveClient();
         log(`🔄 활성 클라이언트를 클라이언트 1 (${playerName1})로 전환`);
       }
     };
 
     client2Box.onclick = () => {
       if (socket2 && socket2.connected) {
-        activeClientNum = 2;
-        updateActiveClient();
         log(`🔄 활성 클라이언트를 클라이언트 2 (${playerName2})로 전환`);
       }
     };
@@ -1218,19 +897,9 @@
         updateButtonText(2, false);
       }
 
-      // 큐 소켓들도 모두 해제
-      queueSockets.forEach(queueSocket => {
-        if (queueSocket.socket && queueSocket.socket.connected) {
-          queueSocket.socket.disconnect();
-        }
-      });
-      queueSockets = [];
-      selectedQueueSocketId = null;
-
       updateRoomInfo();
       rankingSection.style.display = 'none';
-      updateQueueDisplay([]);
-      log('모든 클라이언트 연결 해제 완료 (큐 소켓 포함)');
+      log('모든 클라이언트 연결 해제 완료');
     };
 
     // 게임 완료 버튼
@@ -1286,39 +955,17 @@
       });
     });
 
-    // 큐 상태 확인 버튼
-    statusQueueBtn.onclick = () => {
+    disconnectRoomBtn.onclick = () => {
       const socket = getAnyConnectedSocket();
       if (!socket || !socket.connected) {
-        log('❌ 연결된 소켓이 없습니다. 먼저 소켓을 연결하거나 큐에 참가하세요.');
-        return;
-      }
-      log('📋 큐 상태 확인 요청');
-      socket.emit('status-queue');
-    };
-
-    // 큐 참가 버튼 - 새로운 소켓 생성
-    joinQueueBtn.onclick = () => {
-      createQueueSocket();
-    };
-
-    // 큐 나가기 버튼 - 선택된 소켓 제거
-    leaveQueueBtn.onclick = () => {
-      leaveQueueWithSelectedSocket();
-    };
-
-    // 큐 초기화 버튼
-    resetQueueBtn.onclick = () => {
-      const socket = getAnyConnectedSocket();
-      if (!socket || !socket.connected) {
-        log('❌ 연결된 소켓이 없습니다. 먼저 소켓을 연결하거나 큐에 참가하세요.');
+        log('❌ 연결된 소켓이 없습니다. 먼저 클라이언트를 연결하세요.');
         return;
       }
 
-      log('🔄 큐 초기화 요청...');
-
-      socket.emit('reset-queue', {
-        project: 'dart'
+      const room = roomInput.value.trim() || 'TEST';
+      log(`🛑 방 종료 요청: ${room.toUpperCase()}`);
+      socket.emit('disconnect-room', {
+        room: room.toUpperCase()
       });
     };
 
@@ -1330,8 +977,6 @@
     updateButtonText(1, false);
     updateButtonText(2, false);
     updateRoomInfo();
-    updateQueueDisplay([]);
-    updateActiveClient();
   </script>
 </body>
 

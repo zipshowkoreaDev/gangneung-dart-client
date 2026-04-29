@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-interface QueueLoadingProps {
+interface StatusScreenProps {
   title?: string;
   message?: string;
   actionLabel?: string;
@@ -9,14 +9,14 @@ interface QueueLoadingProps {
   children?: ReactNode;
 }
 
-export default function QueueLoading({
-  title = "대기열 확인 중...",
+export default function StatusScreen({
+  title = "참가 상태 확인 중...",
   message,
   actionLabel,
   onAction,
   actionDisabled = false,
   children,
-}: QueueLoadingProps) {
+}: StatusScreenProps) {
   return (
     <div className="text-center text-neutral-900">
       <div className="mb-2 text-xl font-semibold">{title}</div>

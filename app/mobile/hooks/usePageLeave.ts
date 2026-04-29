@@ -1,42 +1,23 @@
 "use client";
 
 import { useEffect } from "react";
-import { socket } from "@/shared/socket";
-import { debugLog } from "@/app/mobile/lib/debugLog";
 
 interface UsePageLeaveProps {
-  joinedQueueRef: React.MutableRefObject<boolean>;
+  onLeave: () => void;
 }
 
-// 페이지 이탈 시 대기열 정리 hook
-export function usePageLeave({ joinedQueueRef }: UsePageLeaveProps): void {
+// 페이지 이탈 시 로비 정리 hook
+export function usePageLeave({ onLeave }: UsePageLeaveProps): void {
   useEffect(() => {
-    const emitLeaveQueue = (reason: string) => {
-      if (!joinedQueueRef.current) return;
-      debugLog(`[Queue] leave-queue emit (${reason})`);
-      try {
-        socket.emit("leave-queue");
-      } catch {
-        // ignore
-      }
-      try {
-        socket.timeout(200).emit("leave-queue");
-      } catch {
-        // ignore
-      }
-      socket.emit("leave-queue");
-      joinedQueueRef.current = false;
-    };
-
-    const onPageHide = () => emitLeaveQueue("pagehide");
-    const onBeforeUnload = () => emitLeaveQueue("beforeunload");
+    const onPageHide = () => onLeave();
+    const onBeforeUnload = () => onLeave();
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        emitLeaveQueue("visibilitychange");
+        onLeave();
       }
     };
-    const onFreeze = () => emitLeaveQueue("freeze");
-    const onOffline = () => emitLeaveQueue("offline");
+    const onFreeze = () => onLeave();
+    const onOffline = () => onLeave();
 
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("beforeunload", onBeforeUnload);
@@ -45,14 +26,12 @@ export function usePageLeave({ joinedQueueRef }: UsePageLeaveProps): void {
     window.addEventListener("offline", onOffline);
 
     return () => {
-      if (joinedQueueRef.current) {
-        emitLeaveQueue("unmount");
-      }
+      onLeave();
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("freeze", onFreeze as EventListener);
       window.removeEventListener("offline", onOffline);
     };
-  }, [joinedQueueRef]);
+  }, [onLeave]);
 }

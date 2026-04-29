@@ -27,6 +27,7 @@ export default function DisplayPage() {
   } = useDisplayState();
   const { rankings, handlePlayersFinish } = useRankings();
   const { hasMatchStarted, winners } = useDisplayGameSession({
+    room: ROOM,
     setAimPositions,
     setPlayers,
   });

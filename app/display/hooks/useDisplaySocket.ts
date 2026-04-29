@@ -11,7 +11,7 @@ import {
 } from "@/lib/room";
 import {
   getPlayerSocketIds,
-  getQueuePlayerKey,
+  getSlotPlayerKey,
 } from "@/app/display/lib/playerKey";
 import {
   getExistingPlayerEntry,
@@ -35,7 +35,6 @@ import {
 } from "@/app/display/lib/displaySocketSync";
 
 type AimState = Map<string, { x: number; y: number; skin?: string }>;
-const QUEUE_STATUS_INTERVAL_MS = 5000;
 
 interface UseDisplaySocketProps {
   room: string;
@@ -63,7 +62,7 @@ export function useDisplaySocket({
   const gameIdRef = useRef(0);
   const finishedPlayerKeysRef = useRef<Set<string>>(new Set());
   const playerAliasKeyRef = useRef<Map<string, string>>(new Map());
-  const queuedPlayerIdsRef = useRef<string[]>([]);
+  const waitingPlayerIdsRef = useRef<string[]>([]);
   const recentThrowFingerprintsRef = useRef<Map<string, number>>(new Map());
   // React state 비동기 반영 경쟁 조건 방지: 마지막 점수를 ref로 동기 추적
   const playerLastScoresRef = useRef<Map<string, { name: string; score: number }>>(new Map());
@@ -80,9 +79,9 @@ export function useDisplaySocket({
     if (!room) return;
 
     const isRoomEvent = (roomName?: string) => !roomName || roomName === room;
-    const getQueuedSocketSlot = (socketId?: string): PlayerSlot | undefined => {
+    const getWaitingSocketSlot = (socketId?: string): PlayerSlot | undefined => {
       if (!socketId) return undefined;
-      const slotIndex = queuedPlayerIdsRef.current.indexOf(socketId);
+      const slotIndex = waitingPlayerIdsRef.current.indexOf(socketId);
       return slotIndex >= 0 ? ((slotIndex + 1) as PlayerSlot) : undefined;
     };
 
@@ -113,8 +112,6 @@ export function useDisplaySocket({
     const onConnect = () => {
       onLog?.(`Socket connected: ${socket.id}`);
       onLog?.(`Observing room: ${room}`);
-
-      socket.emit("status-queue");
     };
 
     const resetAggregationForNewGame = () => {
@@ -153,9 +150,10 @@ export function useDisplaySocket({
       const joinedSocketIds = getPlayerSocketIds(data.players);
       const removedPlayerKeys: string[] = [];
       if (joinedSocketIds.length > 0) {
-        queuedPlayerIdsRef.current = Array.from(
-          new Set([...queuedPlayerIdsRef.current, ...joinedSocketIds])
-        ).slice(0, MAX_PLAYERS);
+        waitingPlayerIdsRef.current = Array.from(new Set(joinedSocketIds)).slice(
+          0,
+          MAX_PLAYERS,
+        );
       }
 
       setPlayers((prev) => {
@@ -168,16 +166,22 @@ export function useDisplaySocket({
           if (!joinedPlayer.socketId) return;
 
           const displayName = stripDisplayName(joinedPlayer.name);
+          const slot = getWaitingSocketSlot(joinedPlayer.socketId);
+          const slotKey = getSlotPlayerKey(slot);
           const existingEntry =
+            (slotKey && next.has(slotKey)
+              ? ([slotKey, next.get(slotKey)!] as [string, PlayerScore])
+              : undefined) ??
             Array.from(next.entries()).find(
               ([, player]) =>
                 player.socketId === joinedPlayer.socketId ||
-                player.serverName === joinedPlayer.name ||
-                player.name === displayName
-            ) ?? [getQueuePlayerKey(joinedPlayer.socketId), undefined];
-          const [key, existing] = existingEntry;
-          const slot =
-            existing?.slot ?? getQueuedSocketSlot(joinedPlayer.socketId);
+                player.serverName === joinedPlayer.name
+            );
+          const key = slotKey ?? existingEntry?.[0] ?? joinedPlayer.socketId;
+          const existing = existingEntry?.[1];
+          if (existingEntry && existingEntry[0] !== key) {
+            next.delete(existingEntry[0]);
+          }
           rememberPlayerAliases(playerAliasKeyRef.current, key, {
             socketId: joinedPlayer.socketId,
             name: joinedPlayer.name,
@@ -191,7 +195,10 @@ export function useDisplaySocket({
             score: existing?.score ?? 0,
             isConnected: true,
             isReady: existing?.isReady ?? false,
-            isWaiting: false,
+            isWaiting:
+              existing?.isReady || (existing?.totalThrows ?? 0) > 0
+                ? false
+                : true,
             totalThrows: existing?.totalThrows ?? 0,
             currentThrows: existing?.currentThrows ?? 0,
             throwScores: existing?.throwScores ?? [],
@@ -224,41 +231,6 @@ export function useDisplaySocket({
       logPlayerCount("Player count", data);
     };
 
-    const onStatusQueue = (queue: string[]) => {
-      const uniqueQueue = Array.from(new Set(queue)).filter(Boolean);
-      queuedPlayerIdsRef.current = uniqueQueue.slice(0, MAX_PLAYERS);
-      onLog?.(`Queue players: ${uniqueQueue.length}`);
-
-      setPlayers((prev) => {
-        const next = new Map(prev);
-        const queuedSocketIdSet = new Set(uniqueQueue);
-        let changed = false;
-
-        Array.from(next.entries()).forEach(([key, player]) => {
-          if (!player.isWaiting || !player.socketId) return;
-
-          if (!queuedSocketIdSet.has(player.socketId)) {
-            next.delete(key);
-            changed = true;
-            return;
-          }
-
-          const slot = getQueuedSocketSlot(player.socketId);
-          if (slot && player.slot !== slot) {
-            next.set(key, { ...player, slot });
-            changed = true;
-          }
-        });
-
-        if (changed) {
-          playersRef.current = next;
-          return next;
-        }
-
-        return prev;
-      });
-    };
-
     const onDartThrown = (data: {
       room: string;
       name?: string;
@@ -272,7 +244,7 @@ export function useDisplaySocket({
 
       const key = resolveDisplayPlayerKey(data, {
         aliasMap: playerAliasKeyRef.current,
-        getQueuedSocketSlot,
+        getWaitingSocketSlot,
       });
       rememberPlayerAliases(playerAliasKeyRef.current, key, data);
       if (finishedPlayerKeysRef.current.has(key)) {
@@ -300,7 +272,7 @@ export function useDisplaySocket({
         nextPlayers.set(key, {
           socketId: data.socketId,
           serverName: data.name,
-          slot: data.slot ?? getQueuedSocketSlot(data.socketId),
+          slot: data.slot ?? getWaitingSocketSlot(data.socketId),
           name: displayName,
           score: 0,
           isConnected: true,
@@ -378,7 +350,6 @@ export function useDisplaySocket({
       slot?: PlayerSlot;
       skin?: string;
       registration?: boolean;
-      queueRegistration?: boolean;
       aim: { x: number; y: number };
       turnSyncState?: TurnSyncState;
     }) => {
@@ -386,54 +357,14 @@ export function useDisplaySocket({
 
       const key = resolveDisplayPlayerKey(data, {
         aliasMap: playerAliasKeyRef.current,
-        getQueuedSocketSlot,
+        getWaitingSocketSlot,
       });
       rememberPlayerAliases(playerAliasKeyRef.current, key, data);
       const x = clamp(data.aim?.x ?? 0, -1, 1);
       const y = clamp(data.aim?.y ?? 0, -1, 1);
       const displayName = data.name ? stripDisplayName(data.name) : key;
-      const slot = data.slot ?? getQueuedSocketSlot(data.socketId);
+      const slot = data.slot ?? getWaitingSocketSlot(data.socketId);
       const isRegistration = data.registration === true;
-      const isQueueRegistration = data.queueRegistration === true;
-
-      if (isQueueRegistration) {
-        const waitingKey = data.socketId ? getQueuePlayerKey(data.socketId) : key;
-        rememberPlayerAliases(playerAliasKeyRef.current, waitingKey, data);
-
-        setPlayers((prev) => {
-          const next = new Map(prev);
-          const existingEntry = getExistingPlayerEntry(next, waitingKey, data);
-          const existingKey = existingEntry?.[0];
-          const existing = existingEntry?.[1];
-
-          if (existingKey && existingKey !== waitingKey) {
-            next.delete(existingKey);
-          }
-          removeDuplicateWaitingPlayers(next, waitingKey, data.socketId);
-
-          next.set(waitingKey, {
-            socketId: data.socketId,
-            serverName: data.name,
-            slot: slot ?? existing?.slot,
-            name: displayName,
-            score: existing?.score ?? 0,
-            isConnected: true,
-            isReady: false,
-            isWaiting: true,
-            totalThrows: existing?.totalThrows ?? 0,
-            currentThrows: existing?.currentThrows ?? 0,
-            throwScores: existing?.throwScores ?? [],
-            dartDeadlineEndsAt: undefined,
-            turnDelayEndsAt: undefined,
-          });
-
-          playersRef.current = next;
-          return next;
-        });
-
-        return;
-      }
-
       const startsNewGame = isRegistration ? resetAggregationForNewGame() : false;
       if (startsNewGame) {
         window.dispatchEvent(new CustomEvent(DISPLAY_EVENTS.gameStarted));
@@ -563,7 +494,7 @@ export function useDisplaySocket({
 
       const key = resolveDisplayPlayerKey(data, {
         aliasMap: playerAliasKeyRef.current,
-        getQueuedSocketSlot,
+        getWaitingSocketSlot,
       });
       rememberPlayerAliases(playerAliasKeyRef.current, key, data);
       setAimPositions((prev) => {
@@ -702,51 +633,34 @@ export function useDisplaySocket({
       clearDisplayState();
       if (Array.isArray(data.players)) {
         const uniquePlayers = Array.from(new Set(data.players)).filter(Boolean);
-        queuedPlayerIdsRef.current = uniquePlayers;
+        waitingPlayerIdsRef.current = uniquePlayers;
         onLog?.(`Game started with expected players: ${uniquePlayers.length}`);
       }
       window.dispatchEvent(new CustomEvent(DISPLAY_EVENTS.gameStarted));
-    };
-
-    const onResetQueue = () => {
-      resetSessionRefs();
-      queuedPlayerIdsRef.current = [];
-      clearDisplayState();
-      window.dispatchEvent(new CustomEvent(DISPLAY_EVENTS.resetScene));
     };
 
     socket.on("connect", onConnect);
     socket.on("clientInfo", onClientInfo);
     socket.on("joinedRoom", onJoinedRoom);
     socket.on("roomPlayerCount", onRoomPlayerCount);
-    socket.on("status-queue", onStatusQueue);
     socket.on("dart-thrown", onDartThrown);
     socket.on("aim-update", onAimUpdate);
     socket.on("aim-off", onAimOff);
     socket.on("game-result", onGameResult);
     socket.on("game-finished", onGameFinished);
     socket.on("game-started", onGameStarted);
-    socket.on("reset-queue", onResetQueue);
-    const queueStatusTimerId = window.setInterval(() => {
-      if (socket.connected) {
-        socket.emit("status-queue");
-      }
-    }, QUEUE_STATUS_INTERVAL_MS);
 
     return () => {
-      window.clearInterval(queueStatusTimerId);
       socket.off("connect", onConnect);
       socket.off("clientInfo", onClientInfo);
       socket.off("joinedRoom", onJoinedRoom);
       socket.off("roomPlayerCount", onRoomPlayerCount);
-      socket.off("status-queue", onStatusQueue);
       socket.off("dart-thrown", onDartThrown);
       socket.off("aim-update", onAimUpdate);
       socket.off("aim-off", onAimOff);
       socket.off("game-result", onGameResult);
       socket.off("game-finished", onGameFinished);
       socket.off("game-started", onGameStarted);
-      socket.off("reset-queue", onResetQueue);
     };
   }, [
     room,

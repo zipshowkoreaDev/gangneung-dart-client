@@ -5,9 +5,9 @@ type UseStartExitFlowParams = {
   errorMessage: string;
   setStartError: (value: string) => void;
   requestMotionPermission: () => Promise<boolean>;
-  connectAndJoinQueue: () => void;
+  connectAndJoinLobby: () => void;
   resetName: () => void;
-  leaveQueue: () => void;
+  leaveLobby: () => void;
   leaveGame: () => void;
   stopSensors: () => void;
   setHasFinishedTurn: (value: boolean) => void;
@@ -26,9 +26,9 @@ export default function useStartExitFlow({
   errorMessage,
   setStartError,
   requestMotionPermission,
-  connectAndJoinQueue,
+  connectAndJoinLobby,
   resetName,
-  leaveQueue,
+  leaveLobby,
   leaveGame,
   stopSensors,
   setHasFinishedTurn,
@@ -57,13 +57,13 @@ export default function useStartExitFlow({
       }
     }
 
-    connectAndJoinQueue();
+    connectAndJoinLobby();
   }, [
     errorMessage,
     setStartError,
     setHasFinishedTurn,
     requestMotionPermission,
-    connectAndJoinQueue,
+    connectAndJoinLobby,
   ]);
 
   const handleExit = useCallback(() => {
@@ -73,7 +73,7 @@ export default function useStartExitFlow({
     resetName();
     setIsInGame(false);
     setHasJoined(false);
-    leaveQueue();
+    leaveLobby();
     leaveGame();
     stopSensors();
   }, [
@@ -81,7 +81,7 @@ export default function useStartExitFlow({
     resetName,
     setIsInGame,
     setHasJoined,
-    leaveQueue,
+    leaveLobby,
     leaveGame,
     stopSensors,
     setStartError,

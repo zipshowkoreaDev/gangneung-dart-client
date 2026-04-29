@@ -45,9 +45,9 @@ export default function AdminQRPage() {
     alert("클립보드에 복사되었습니다!");
   }, []);
 
-  const resetQueue = useCallback(() => {
+  const disconnectRoom = useCallback(() => {
     const confirmed = window.confirm(
-      "현재 대기열과 진행 상태를 전체 초기화할까요?",
+      "현재 방의 모든 연결을 종료하고 세션을 정리할까요?",
     );
     if (!confirmed) return;
 
@@ -56,8 +56,8 @@ export default function AdminQRPage() {
       socket.connect();
     }
 
-    socket.emit("reset-queue", { project: "dart" });
-    alert("전체 리셋 요청을 보냈습니다.");
+    socket.emit("disconnect-room", { room: DEFAULT_ROOM });
+    alert("방 종료 요청을 보냈습니다.");
   }, []);
 
   return (
@@ -83,10 +83,10 @@ export default function AdminQRPage() {
                   새 QR 코드 생성
                 </button>
                 <button
-                  onClick={resetQueue}
+                  onClick={disconnectRoom}
                   className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white text-lg font-semibold rounded-lg transition-colors shadow-lg"
                 >
-                  전체 리셋
+                  방 종료
                 </button>
               </div>
             </div>
@@ -163,7 +163,7 @@ export default function AdminQRPage() {
           <ol className="text-yellow-100 text-sm space-y-2 list-decimal list-inside">
             <li>위 QR 코드를 현장에 배치합니다</li>
             <li>플레이어가 QR 코드를 스캔하면 세션이 발급됩니다</li>
-            <li>플레이어는 {DEFAULT_ROOM} 룸의 대기열에 입장합니다</li>
+              <li>플레이어는 {DEFAULT_ROOM} 룸에 입장합니다</li>
             <li>Display는 해당 룸을 구독하여 게임을 표시합니다</li>
             <li>
               새로운 QR 코드가 필요하면 &quot;새 QR 코드 생성&quot; 버튼을

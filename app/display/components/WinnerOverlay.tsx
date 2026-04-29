@@ -1,6 +1,7 @@
 "use client";
 
 import type { FinishedPlayer } from "@/app/display/types/events";
+import { formatDuplicateDisplayNames } from "@/lib/displayName";
 
 type WinnerOverlayProps = {
   winners: FinishedPlayer[];
@@ -8,6 +9,7 @@ type WinnerOverlayProps = {
 
 export default function WinnerOverlay({ winners }: WinnerOverlayProps) {
   if (winners.length === 0) return null;
+  const displayNames = formatDuplicateDisplayNames(winners, (winner) => winner.name);
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 px-8 text-center text-white">
@@ -20,7 +22,7 @@ export default function WinnerOverlay({ winners }: WinnerOverlayProps) {
             key={`${winner.name}-${winner.score}-${index}`}
             className="max-w-full truncate text-6xl font-bold text-[#FFD700]"
           >
-            {winner.name}
+            {displayNames[index]}
           </div>
         ))}
       </div>

@@ -12,8 +12,8 @@ export function getSlotPlayerKey(slot?: PlayerSlot) {
   return slot ? `slot-${slot}` : undefined;
 }
 
-export function getQueuePlayerKey(socketId: string) {
-  return `queue-${socketId}`;
+export function getWaitingPlayerKey(socketId: string) {
+  return `waiting-${socketId}`;
 }
 
 export function getPlayerSocketIds(
