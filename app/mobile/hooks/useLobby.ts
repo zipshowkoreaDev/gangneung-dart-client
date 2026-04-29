@@ -358,7 +358,6 @@ export function useLobby({
 
     return () => {
       window.clearInterval(timeoutId);
-      clearApprovalWait();
       socket.off("connect", onConnect);
       socket.off("connect_error", onConnectError);
       socket.off("error", onError);
