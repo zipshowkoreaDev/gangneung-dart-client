@@ -1,13 +1,20 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { getQRSession } from "@/lib/session";
 import { getRoomFromUrl, MAX_PLAYERS, type PlayerSlot } from "@/lib/room";
 import { TURN_RESULT_DELAY_MS } from "@/lib/gameTiming";
 import { socket } from "@/shared/socket";
-import { useMobileSocket } from "./hooks/useMobileSocket";
+import { useMobileSocket } from "./hooks/socket/useMobileSocket";
 import { useGyroscope } from "./hooks/useGyroscope";
-import { usePageLeave } from "./hooks/usePageLeave";
+import { usePageLeave } from "./hooks/socket/usePageLeave";
 import useNameInputFlow from "./hooks/useNameInputFlow";
 import useGameLifecycle from "./hooks/useGameLifecycle";
 import useMobileGameSession from "./hooks/useMobileGameSession";
@@ -21,12 +28,14 @@ import GameScreen from "./components/GameScreen";
 import ResultScreen from "./components/ResultScreen";
 import StatusScreen from "./components/StatusScreen";
 import { formatDuplicateDisplayNames } from "@/lib/displayName";
-import { useLobby } from "./hooks/useLobby";
+import { useLobby } from "./hooks/socket/useLobby";
 import { debugLog } from "./lib/debugLog";
 
 export default function MobilePage() {
-  const [sessionValid] = useState<boolean | null>(() =>
-    getQRSession() !== null ? true : false,
+  const sessionValid = useSyncExternalStore(
+    () => () => {},
+    () => getQRSession() !== null,
+    () => null,
   );
   const [room] = useState(getRoomFromUrl);
   const {
@@ -122,7 +131,6 @@ export default function MobilePage() {
     name: socketName,
     enabled: hasJoined,
     slot: assignedSlot,
-    roomJoinedBeforeGame: true,
     onPlayerFinished: handlePlayerFinished,
     onPlayerScored: handlePlayerScored,
     onGameResult: setGameResult,

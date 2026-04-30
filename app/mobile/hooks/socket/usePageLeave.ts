@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface UsePageLeaveProps {
   onLeave: () => void;
@@ -8,16 +8,22 @@ interface UsePageLeaveProps {
 
 // 페이지 이탈 시 로비 정리 hook
 export function usePageLeave({ onLeave }: UsePageLeaveProps): void {
+  const onLeaveRef = useRef(onLeave);
+
   useEffect(() => {
-    const onPageHide = () => onLeave();
-    const onBeforeUnload = () => onLeave();
+    onLeaveRef.current = onLeave;
+  }, [onLeave]);
+
+  useEffect(() => {
+    const onPageHide = () => onLeaveRef.current();
+    const onBeforeUnload = () => onLeaveRef.current();
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        onLeave();
+        onLeaveRef.current();
       }
     };
-    const onFreeze = () => onLeave();
-    const onOffline = () => onLeave();
+    const onFreeze = () => onLeaveRef.current();
+    const onOffline = () => onLeaveRef.current();
 
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("beforeunload", onBeforeUnload);
@@ -26,12 +32,11 @@ export function usePageLeave({ onLeave }: UsePageLeaveProps): void {
     window.addEventListener("offline", onOffline);
 
     return () => {
-      onLeave();
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("freeze", onFreeze as EventListener);
       window.removeEventListener("offline", onOffline);
     };
-  }, [onLeave]);
+  }, []);
 }

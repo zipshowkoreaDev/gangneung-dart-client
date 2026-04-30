@@ -174,7 +174,7 @@ Gangneung Dart 프로젝트 기능 명세 및 테스트 케이스 정의
 
 ---
 
-## 4. 로비 승인 플로우 (`app/mobile/hooks/useLobby.ts`)
+## 4. 로비 승인 플로우 (`app/mobile/hooks/socket/useLobby.ts`)
 
 ### 4.1 슬롯 배정
 

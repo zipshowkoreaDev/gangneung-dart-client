@@ -94,8 +94,8 @@ npm run dev
 
 ### 4. 게임 시작
 
-1. host가 `start-game`을 요청합니다.
-2. 서버/클라이언트는 `game-started`를 기준으로 같은 참가자 집합을 확정합니다.
+1. host가 `startGame`을 요청합니다.
+2. 서버/클라이언트는 `gameStarted`를 기준으로 같은 참가자 집합을 확정합니다.
 3. 각 모바일은 자신의 `slot`과 참가자 목록을 받아 게임 상태로 전환합니다.
 4. 디스플레이는 기존 게임 상태를 비우고 새 세션 UI로 초기화합니다.
 
@@ -141,7 +141,7 @@ npm run dev
 ### 4. 세션은 종료 시 완전히 비움
 
 - 게임 종료 후 현재 room의 연결을 모두 끊어 다음 세션과 섞이지 않게 합니다.
-- 페이지 이탈/언마운트 시 `leaveRoom` 중심으로 정리합니다.
+- 페이지 이탈/언마운트 시 소켓 연결 정리와 room 상태 초기화를 수행합니다.
 - 모바일은 `roomFull`과 `disconnect` 이후 초기 상태로 되돌아갈 수 있어야 합니다.
 
 ---
@@ -153,7 +153,6 @@ npm run dev
 | 이벤트 | 송신 주체 | 목적 |
 |------|------|------|
 | `joinRoom` | mobile | room 참가 시도 |
-| `leaveRoom` | mobile | room 이탈 |
 | `joinedRoom` | server | 현재 room 참가자 목록 전달 |
 | `roomPlayerCount` | server | room 인원 수 전달 |
 | `roomFull` | server | 정원 초과 안내 |
@@ -163,8 +162,8 @@ npm run dev
 
 | 이벤트 | 송신 주체 | 목적 |
 |------|------|------|
-| `start-game` | mobile host | 게임 시작 요청 |
-| `game-started` | server/host flow | 참가자 집합 확정, 게임 시작 알림 |
+| `startGame` | mobile host | 게임 시작 요청 |
+| `gameStarted` | server/host flow | 참가자 집합 확정, 게임 시작 알림 |
 | `aim-update` | mobile | 조준 좌표 전송 |
 | `throw-dart` | mobile | 투척 결과 전송 |
 | `aim-off` | mobile | 턴 종료 알림 |
@@ -233,7 +232,7 @@ npm run dev
 
 - `game-result`
 - `game-finished`
-- 종료 카운트다운 후 `leaveRoom`, 센서 정리
+- 종료 카운트다운 후 소켓 정리, 센서 정리
 - 이후 room 전체 종료는 `disconnect-room`에 맡김
 
 ---
@@ -247,7 +246,7 @@ npm run dev
 
 ### 게임 시작
 
-- `game-started` 수신 시 이전 세션 상태 제거
+- `gameStarted` 수신 시 이전 세션 상태 제거
 - 점수판, 조준점, 다트 상태 초기화
 - 새 게임 세션 UI 시작
 
@@ -286,7 +285,7 @@ npm run dev
 
 ## 안정화 / 예외 처리
 
-- 페이지 이탈 시 `leaveRoom` 정리
+- 페이지 이탈 시 소켓 연결 정리
 - room full 시 모바일 진입 차단
 - display는 결과 화면 종료 후 room 전체 연결 정리
 - 모바일은 게임 종료 후 cleanup을 명시적으로 수행

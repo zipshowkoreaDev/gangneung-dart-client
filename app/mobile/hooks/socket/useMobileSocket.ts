@@ -12,7 +12,6 @@ interface UseMobileSocketProps {
   name: string;
   enabled: boolean;
   slot: PlayerSlot | null;
-  roomJoinedBeforeGame?: boolean;
   onPlayerFinished?: (playerId: string) => void;
   onPlayerScored?: (player: {
     socketId: string;
@@ -39,7 +38,6 @@ export function useMobileSocket({
   name,
   enabled,
   slot,
-  roomJoinedBeforeGame = false,
   onPlayerFinished,
   onPlayerScored,
   onGameResult,
@@ -127,10 +125,6 @@ export function useMobileSocket({
       if (gameEndedRef.current) return;
       if (hasJoinedRef.current && currentRoomRef.current === room) return;
       syncCurrentSocketId();
-      if (!roomJoinedBeforeGame) {
-        debugLog(`[Socket] joinRoom: ${room}, name: ${name}`);
-        socket.emit("joinRoom", { room, name });
-      }
       emitRegistration();
       registrationTimerIds.push(
         window.setTimeout(emitRegistration, 300),
@@ -268,7 +262,7 @@ export function useMobileSocket({
       socket.off("joinedRoom", handleJoinedRoom);
       socket.off("roomPlayerCount", handleRoomPlayerCount);
     };
-  }, [room, name, enabled, slot, roomJoinedBeforeGame, syncCurrentSocketId]);
+  }, [room, name, enabled, slot, syncCurrentSocketId]);
 
   // unmount 시 정리
   useEffect(() => {

@@ -61,9 +61,7 @@ export function useLobby({
     null,
   );
   const joinedLobbyRef = useRef(false);
-  const lastRejoinAtRef = useRef(0);
   const lobbyStartAtRef = useRef<number | null>(null);
-  const lastJoinedSocketIdRef = useRef<string | null>(null);
   const startRequestedRef = useRef(false);
   const lobbyPlayersRef = useRef<string[]>([]);
   const lobbyOrderRef = useRef<string[]>([]);
@@ -77,26 +75,27 @@ export function useLobby({
     setHostApprovalDeadline(null);
   }, []);
 
+  const resetLobbyState = useCallback(() => {
+    joinedRoomRef.current = false;
+    joinedLobbyRef.current = false;
+    lobbyPlayersRef.current = [];
+    lobbyOrderRef.current = [];
+    lobbyStartAtRef.current = null;
+    startRequestedRef.current = false;
+    setIsInLobby(false);
+    setLobbyPosition(null);
+    setLobbyPlayers(null);
+    setLobbyPlayerNames(new Map());
+    clearApprovalWait();
+  }, [clearApprovalWait]);
+
   const leaveLobby = useCallback(() => {
     if (socket.connected) {
       debugLog("[Lobby] socket disconnect");
       socket.disconnect();
     }
-    joinedRoomRef.current = false;
-    joinedLobbyRef.current = false;
-    setIsInLobby(false);
-    setLobbyPosition(null);
-    setLobbyPlayers(null);
-    setLobbyPlayerNames(new Map());
-    lobbyPlayersRef.current = [];
-    lobbyOrderRef.current = [];
-    setIsHost(false);
-    setCanStartGame(false);
-    setHostApprovalTimeLeft(null);
-    lobbyStartAtRef.current = null;
-    startRequestedRef.current = false;
-    clearApprovalWait();
-  }, [clearApprovalWait]);
+    resetLobbyState();
+  }, [resetLobbyState]);
 
   const connectAndJoinLobby = useCallback(() => {
     if (socket.connected) {
@@ -104,7 +103,6 @@ export function useLobby({
       socket.disconnect();
       joinedLobbyRef.current = false;
       joinedRoomRef.current = false;
-      lastJoinedSocketIdRef.current = null;
     }
     clearApprovalWait();
     debugLog("[Socket] 연결 시도...");
@@ -216,17 +214,7 @@ export function useLobby({
       setLobbyPosition(position);
 
       if (position < 0 && joinedLobbyRef.current) {
-        const now = Date.now();
-        if (now - lastRejoinAtRef.current > 5000) {
-          lastRejoinAtRef.current = now;
-          debugLog("[Lobby] 내 소켓이 방에 없음 - 재입장 시도");
-          joinedRoomRef.current = false;
-          joinRoomIfNeeded();
-          joinedLobbyRef.current = true;
-          if (socket.id) {
-            lastJoinedSocketIdRef.current = socket.id;
-          }
-        }
+        debugLog("[Lobby] 내 소켓이 방 목록에 아직 없음 - 현재 로비 상태 유지");
         clearApprovalWait();
         return;
       }
@@ -295,14 +283,16 @@ export function useLobby({
     const onConnect = () => {
       debugLog("[Socket] connected (lobby mode)");
 
-      if (!joinedLobbyRef.current || lastJoinedSocketIdRef.current !== socket.id) {
+      if (!joinedLobbyRef.current) {
         debugLog("[Lobby] joinRoom emit");
         joinedLobbyRef.current = true;
-        if (socket.id) {
-          lastJoinedSocketIdRef.current = socket.id;
-        }
         joinRoomIfNeeded();
       }
+    };
+
+    const onDisconnect = (reason: string) => {
+      debugLog(`[Socket] disconnected (lobby mode): ${reason}`);
+      resetLobbyState();
     };
 
     const onConnectError = (err: unknown) => {
@@ -327,6 +317,7 @@ export function useLobby({
     };
 
     socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
     socket.on("connect_error", onConnectError);
     socket.on("error", onError);
     socket.on("roomFull", onRoomFull);
@@ -350,6 +341,7 @@ export function useLobby({
     return () => {
       window.clearInterval(timeoutId);
       socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
       socket.off("connect_error", onConnectError);
       socket.off("error", onError);
       socket.off("roomFull", onRoomFull);
@@ -365,6 +357,7 @@ export function useLobby({
     leaveLobby,
     name,
     onEnterGame,
+    resetLobbyState,
     room,
   ]);
 
