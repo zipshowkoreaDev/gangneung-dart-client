@@ -24,13 +24,13 @@ interface UseMobileSocketProps {
     rank: number;
     totalPlayers: number;
   }) => void;
-  onRoomFull?: (data: { room?: string; maxPlayers?: number }) => void;
   onRoomPlayersUpdated?: (data: {
     room?: string;
     playerCount: number;
     players?: Array<{ socketId: string; name: string }>;
   }) => void;
   onGameFinished?: () => void;
+  onDisconnected?: (notice: { title: string; message: string }) => void;
 }
 
 export function useMobileSocket({
@@ -41,9 +41,9 @@ export function useMobileSocket({
   onPlayerFinished,
   onPlayerScored,
   onGameResult,
-  onRoomFull,
   onRoomPlayersUpdated,
   onGameFinished,
+  onDisconnected,
 }: UseMobileSocketProps) {
   const throwCountRef = useRef(0);
   const hasJoinedRef = useRef(false);
@@ -71,10 +71,6 @@ export function useMobileSocket({
   useEffect(() => {
     onGameResultRef.current = onGameResult;
   }, [onGameResult]);
-  const onRoomFullRef = useRef(onRoomFull);
-  useEffect(() => {
-    onRoomFullRef.current = onRoomFull;
-  }, [onRoomFull]);
   const onRoomPlayersUpdatedRef = useRef(onRoomPlayersUpdated);
   useEffect(() => {
     onRoomPlayersUpdatedRef.current = onRoomPlayersUpdated;
@@ -83,6 +79,11 @@ export function useMobileSocket({
   useEffect(() => {
     onGameFinishedRef.current = onGameFinished;
   }, [onGameFinished]);
+  const onDisconnectedRef = useRef(onDisconnected);
+  useEffect(() => {
+    onDisconnectedRef.current = onDisconnected;
+  }, [onDisconnected]);
+  const suppressDisconnectNoticeRef = useRef(false);
 
   // enabled가 true로 바뀔 때(재입장 포함)에도 slotRef를 동기화
   useEffect(() => {
@@ -190,13 +191,6 @@ export function useMobileSocket({
       gameEndedRef.current = true;
       onGameFinishedRef.current?.();
     };
-    const handleRoomFull = (data: { room?: string; maxPlayers?: number }) => {
-      debugLog(`[Socket] roomFull: ${data.room ?? room}`);
-      hasJoinedRef.current = false;
-      currentRoomRef.current = "";
-      throwCountRef.current = 0;
-      onRoomFullRef.current?.(data);
-    };
     const handleJoinedRoom = (data: {
       room?: string;
       playerCount: number;
@@ -226,21 +220,28 @@ export function useMobileSocket({
 
     const handleDisconnect = () => {
       debugLog("[Socket] disconnected");
+      const shouldSuppress = suppressDisconnectNoticeRef.current;
+      suppressDisconnectNoticeRef.current = false;
       hasJoinedRef.current = false;
       currentRoomRef.current = "";
       throwCountRef.current = 0;
       setCurrentSocketId(undefined);
+      if (!shouldSuppress) {
+        onDisconnectedRef.current?.({
+          title: "연결 종료",
+          message: "게임 연결이 끊어졌습니다. 다시 참가해주세요.",
+        });
+      }
     };
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("aim-off", handleAimOff);
-    socket.on("dart-thrown", handleDartThrown);
-    socket.on("game-result", handleGameResult);
-    socket.on("game-finished", handleGameFinished);
-    socket.on("roomFull", handleRoomFull);
-    socket.on("joinedRoom", handleJoinedRoom);
-    socket.on("roomPlayerCount", handleRoomPlayerCount);
+      socket.on("dart-thrown", handleDartThrown);
+      socket.on("game-result", handleGameResult);
+      socket.on("game-finished", handleGameFinished);
+      socket.on("joinedRoom", handleJoinedRoom);
+      socket.on("roomPlayerCount", handleRoomPlayerCount);
 
     if (socket.connected && !hasJoinedRef.current) {
       handleConnect();
@@ -258,7 +259,6 @@ export function useMobileSocket({
       socket.off("dart-thrown", handleDartThrown);
       socket.off("game-result", handleGameResult);
       socket.off("game-finished", handleGameFinished);
-      socket.off("roomFull", handleRoomFull);
       socket.off("joinedRoom", handleJoinedRoom);
       socket.off("roomPlayerCount", handleRoomPlayerCount);
     };
@@ -269,6 +269,7 @@ export function useMobileSocket({
     return () => {
       if (socket.connected) {
         debugLog("[Socket] disconnect (unmount)");
+        suppressDisconnectNoticeRef.current = true;
         socket.disconnect();
       }
       hasJoinedRef.current = false;
@@ -352,6 +353,7 @@ export function useMobileSocket({
         });
       }
       debugLog("[Socket] disconnect (game exit)");
+      suppressDisconnectNoticeRef.current = true;
       socket.disconnect();
     }
 

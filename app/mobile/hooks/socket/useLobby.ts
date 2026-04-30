@@ -17,6 +17,7 @@ interface UseLobbyProps {
   name: string;
   isInGame: boolean;
   onEnterGame: (slot: PlayerSlot, players: string[]) => void;
+  onDisconnectNotice: (notice: { title: string; message: string }) => void;
 }
 
 export type WaitingPlayer = {
@@ -44,6 +45,7 @@ export function useLobby({
   name,
   isInGame,
   onEnterGame,
+  onDisconnectNotice,
 }: UseLobbyProps): UseLobbyReturn {
   const [isInLobby, setIsInLobby] = useState(false);
   const [lobbyPosition, setLobbyPosition] = useState<number | null>(null);
@@ -66,6 +68,11 @@ export function useLobby({
   const lobbyPlayersRef = useRef<string[]>([]);
   const lobbyOrderRef = useRef<string[]>([]);
   const joinedRoomRef = useRef(false);
+  const pendingDisconnectNoticeRef = useRef<{
+    title: string;
+    message: string;
+  } | null>(null);
+  const suppressDisconnectNoticeRef = useRef(false);
 
   const clearApprovalWait = useCallback(() => {
     setIsWaitingForApproval(false);
@@ -90,12 +97,29 @@ export function useLobby({
   }, [clearApprovalWait]);
 
   const leaveLobby = useCallback(() => {
+    suppressDisconnectNoticeRef.current = true;
     if (socket.connected) {
       debugLog("[Lobby] socket disconnect");
       socket.disconnect();
     }
     resetLobbyState();
   }, [resetLobbyState]);
+
+  const leaveLobbyWithNotice = useCallback(
+    (notice: { title: string; message: string }) => {
+      pendingDisconnectNoticeRef.current = notice;
+      suppressDisconnectNoticeRef.current = false;
+      if (socket.connected) {
+        debugLog(`[Lobby] socket disconnect with notice: ${notice.title}`);
+        socket.disconnect();
+        return;
+      }
+      resetLobbyState();
+      onDisconnectNotice(notice);
+      pendingDisconnectNoticeRef.current = null;
+    },
+    [onDisconnectNotice, resetLobbyState],
+  );
 
   const connectAndJoinLobby = useCallback(() => {
     if (socket.connected) {
@@ -292,7 +316,21 @@ export function useLobby({
 
     const onDisconnect = (reason: string) => {
       debugLog(`[Socket] disconnected (lobby mode): ${reason}`);
+      const pendingNotice = pendingDisconnectNoticeRef.current;
+      const shouldSuppress = suppressDisconnectNoticeRef.current;
+      pendingDisconnectNoticeRef.current = null;
+      suppressDisconnectNoticeRef.current = false;
       resetLobbyState();
+      if (pendingNotice) {
+        onDisconnectNotice(pendingNotice);
+        return;
+      }
+      if (!shouldSuppress) {
+        onDisconnectNotice({
+          title: "연결 종료",
+          message: "참가 연결이 끊어졌습니다. 다시 참가해주세요.",
+        });
+      }
     };
 
     const onConnectError = (err: unknown) => {
@@ -313,7 +351,10 @@ export function useLobby({
           data.maxPlayers ?? MAX_PLAYERS
         }`,
       );
-      leaveLobby();
+      leaveLobbyWithNotice({
+        title: "정원 초과",
+        message: "현재 방 정원이 가득 차 참가할 수 없습니다. 다시 시도해주세요.",
+      });
     };
 
     socket.on("connect", onConnect);
@@ -330,7 +371,10 @@ export function useLobby({
       const elapsed = Date.now() - lobbyStartAtRef.current;
       if (elapsed >= LOBBY_TIMEOUT_MS) {
         debugLog("[Lobby] 대기 타임아웃 - 자동 이탈");
-        leaveLobby();
+        leaveLobbyWithNotice({
+          title: "시간 초과",
+          message: "참가 대기 시간이 초과되어 대기열에서 나갔습니다. 다시 참가해주세요.",
+        });
       }
     }, 5000);
 
@@ -355,7 +399,9 @@ export function useLobby({
     isInGame,
     isInLobby,
     leaveLobby,
+    leaveLobbyWithNotice,
     name,
+    onDisconnectNotice,
     onEnterGame,
     resetLobbyState,
     room,
@@ -411,7 +457,10 @@ export function useLobby({
 
       if (timeLeft <= 0) {
         debugLog("[Lobby] host approval timeout - leave room");
-        leaveLobby();
+        leaveLobbyWithNotice({
+          title: "시간 초과",
+          message: "30초 안에 게임을 시작하지 않아 대기열에서 나갔습니다. 다시 참가해주세요.",
+        });
       }
     };
 
@@ -425,6 +474,8 @@ export function useLobby({
     isInLobby,
     isWaitingForApproval,
     leaveLobby,
+    leaveLobbyWithNotice,
+    onDisconnectNotice,
   ]);
 
   const waitingPlayers =

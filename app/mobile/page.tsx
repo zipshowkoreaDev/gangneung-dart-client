@@ -32,6 +32,10 @@ import { useLobby } from "./hooks/socket/useLobby";
 import { debugLog } from "./lib/debugLog";
 
 export default function MobilePage() {
+  const [disconnectNotice, setDisconnectNotice] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const sessionValid = useSyncExternalStore(
     () => () => {},
     () => getQRSession() !== null,
@@ -64,6 +68,14 @@ export default function MobilePage() {
     [setAssignedSlot, setGamePlayers, setHasJoined, setIsInGame],
   );
 
+  const handleDisconnectNotice = useCallback(
+    (notice: { title: string; message: string }) => {
+      debugLog(`[Mobile] disconnect notice: ${notice.title}`);
+      setDisconnectNotice(notice);
+    },
+    [],
+  );
+
   const {
     isInLobby,
     lobbyPosition,
@@ -81,6 +93,7 @@ export default function MobilePage() {
     name: socketName,
     isInGame,
     onEnterGame: handleEnterGame,
+    onDisconnectNotice: handleDisconnectNotice,
   });
 
   const {
@@ -104,22 +117,6 @@ export default function MobilePage() {
     finishGameEmittedRef.current = false;
   }, [resetSessionRoundState]);
 
-  const handleRoomFull = useCallback(
-    (data: { room?: string; maxPlayers?: number }) => {
-      setStartError(
-        data.maxPlayers
-          ? `방 정원이 가득 찼습니다. 최대 ${data.maxPlayers}명까지 참여할 수 있습니다.`
-          : "방 정원이 가득 찼습니다.",
-      );
-      setIsInGame(false);
-      setHasJoined(false);
-      setAssignedSlot(null);
-      setGamePlayers([]);
-      resetRoundState();
-    },
-    [resetRoundState],
-  );
-
   const {
     emitAimUpdate,
     emitAimOff,
@@ -134,8 +131,8 @@ export default function MobilePage() {
     onPlayerFinished: handlePlayerFinished,
     onPlayerScored: handlePlayerScored,
     onGameResult: setGameResult,
-    onRoomFull: handleRoomFull,
     onGameFinished: handleSocketGameFinished,
+    onDisconnected: handleDisconnectNotice,
   });
 
   const {
@@ -260,6 +257,32 @@ export default function MobilePage() {
     [setCustomName, startError],
   );
 
+  const resetMobileState = useCallback(() => {
+    setStartError("");
+    setHasFinishedTurn(false);
+    setIsInGame(false);
+    setHasJoined(false);
+    setAssignedSlot(null);
+    setGamePlayers([]);
+    resetRoundState();
+    resetName();
+    leaveLobby();
+    leaveGame();
+    stopSensors();
+  }, [
+    leaveGame,
+    leaveLobby,
+    resetName,
+    resetRoundState,
+    setHasFinishedTurn,
+    stopSensors,
+  ]);
+
+  const handleDisconnectNoticeConfirm = useCallback(() => {
+    setDisconnectNotice(null);
+    resetMobileState();
+  }, [resetMobileState]);
+
   const isWaitingForApproval =
     isInLobby &&
     !isInGame &&
@@ -317,7 +340,16 @@ export default function MobilePage() {
       {sessionValid === null && <SessionValidating />}
       {sessionValid === false && <AccessDenied />}
 
-      {sessionValid === true && isWaitingForApproval && (
+      {sessionValid === true && disconnectNotice && (
+        <StatusScreen
+          title={disconnectNotice.title}
+          message={disconnectNotice.message}
+          actionLabel="확인"
+          onAction={handleDisconnectNoticeConfirm}
+        />
+      )}
+
+      {sessionValid === true && !disconnectNotice && isWaitingForApproval && (
         <StatusScreen
           title={isHost ? "참가자 대기 중" : "게임 시작 대기 중"}
           message={
@@ -333,14 +365,14 @@ export default function MobilePage() {
         </StatusScreen>
       )}
 
-      {sessionValid === true && hasFinishedTurn && !gameFinished && (
+      {sessionValid === true && !disconnectNotice && hasFinishedTurn && !gameFinished && (
         <StatusScreen
           title="다른 플레이어 진행 중"
           message="모든 플레이어가 끝날 때까지 기다려주세요."
         />
       )}
 
-      {sessionValid === true && gameFinished && (
+      {sessionValid === true && !disconnectNotice && gameFinished && (
         <ResultScreen
           name={customName}
           score={gameResult?.score ?? totalScore}
@@ -350,7 +382,7 @@ export default function MobilePage() {
         />
       )}
 
-      {sessionValid === true && !hasFinishedTurn && isInGame && myTurn && (
+      {sessionValid === true && !disconnectNotice && !hasFinishedTurn && isInGame && myTurn && (
         <GameScreen
           slot={assignedSlot}
           throwsLeft={throwsLeft}
@@ -362,7 +394,7 @@ export default function MobilePage() {
         />
       )}
 
-      {sessionValid === true && !hasFinishedTurn && isInGame && !myTurn && (
+      {sessionValid === true && !disconnectNotice && !hasFinishedTurn && isInGame && !myTurn && (
         <StatusScreen
           title="차례 대기 중"
           message="앞 플레이어의 투구가 끝나면 자동으로 시작됩니다."
@@ -370,6 +402,7 @@ export default function MobilePage() {
       )}
 
       {sessionValid === true &&
+        !disconnectNotice &&
         !isInLobby &&
         !hasFinishedTurn &&
         !isInGame && (
@@ -382,6 +415,7 @@ export default function MobilePage() {
         )}
 
       {sessionValid === true &&
+        !disconnectNotice &&
         isInLobby &&
         !isInGame &&
         !isWaitingForApproval && (
