@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import NaverAnalytics from "./shared/NaverAnalytics";
 
 export const metadata: Metadata = {
   title: "Gangneung Dart Game",
@@ -13,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        {children}
+        <NaverAnalytics />
+      </body>
     </html>
   );
 }
