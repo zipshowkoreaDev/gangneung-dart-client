@@ -13,7 +13,7 @@ pipeline {
 
         stage('Clone Repository') {
             steps {
-                git branch: 'main', url: 'https://github.com/zipshowkoreaDev/gangneung_dart_client'
+                git branch: 'main', url: 'https://github.com/zipshowkoreaDev/gangneung-dart-client'
             }
         }
 
