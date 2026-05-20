@@ -26,6 +26,9 @@ pipeline {
         }
 
         stage('Build and Run Docker Compose') {
+            when {
+                expression { !env.GIT_COMMIT_MSG.startsWith('docs:') }
+            }
             steps {
                 script {
                     bat """
@@ -48,6 +51,7 @@ pipeline {
                     <${env.BUILD_URL}|View Build>
                     Branch: `${env.GIT_BRANCH}`
                     Commit: `${env.GIT_COMMIT_MSG}`
+                    ${env.GIT_COMMIT_MSG.startsWith('docs:') ? 'Deploy: skipped for docs-only commit' : 'Deploy: completed'}
                     """
             )
         }

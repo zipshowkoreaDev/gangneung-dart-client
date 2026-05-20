@@ -12,8 +12,10 @@ COPY postcss.config.mjs ./
 
 # 의존성 설치
 RUN npm cache clean --force
-RUN rm -rf node_modules
-RUN npm install --force
+RUN npm config set fetch-retries 5 \
+ && npm config set fetch-retry-mintimeout 20000 \
+ && npm config set fetch-retry-maxtimeout 120000 \
+ && npm ci
 
 # 소스 코드 복사
 COPY . .
